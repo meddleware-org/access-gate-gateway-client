@@ -19,32 +19,37 @@
 
 **Deployment status:**
 
-- npm `@meddleware/nft-gate-client` **0.0.16**, published 2026-10-08T06:28Z (`dist-tags.latest`), with an
-  SLSA v1 provenance attestation on the registry (`dist.attestations.provenance.predicateType` =
-  `https://slsa.dev/provenance/v1`, `gitHead` = `e114369`). Git tag `v0.0.16` is at `e114369`.
-- `main` is ahead of the tag and unreleased. The 2026-10-09 commits (`ff6256d` Dependabot config,
-  `ed876ba` dev-dependency lockfile bump) did not change `src/`. The 2026-10-10 fix wave (commit `f7abef3`)
-  is **0.0.17**: strict base64 / UTF-8 / JSON decoding (F24), type guards in place of the three casts
-  (F25), no URL echo in `gatewayOrigin` errors (F26), `engines`, CI build and lint (F19, F20), eleven new
-  `proofDecodeRejects` vectors. It is not yet tagged or published; until it is, the consumers below run
-  the lenient 0.0.16 decoder.
-- Consumers: `nft-gate/gateway-workers` (`^0.0.16`; imports the decoder and the message derivation; Worker
-  redeployed from `main` 2026-10-09 against the 2026-10-09 `access_gate` publication and relay gate),
-  `walrus-client` (`^0.0.16`; `fetchChallenge` + `buildAccessProof`) and `docs` (`^0.0.16`).
+- npm `@meddleware/nft-gate-client` **0.0.17** (`dist-tags.latest`), released 2026-10-10 (published
+  2026-10-10T15:14Z), with an SLSA v1 provenance attestation on the registry (`dist.attestations` present,
+  checked 2026-10-18). Git tag `v0.0.17` is at `9f430ff` (code commit `f7abef3`; the later commit only
+  records the hash in this audit). 0.0.16 (published 2026-10-08T06:28Z, tag `v0.0.16` at `e114369`) was the
+  release of the 2026-10-09 pass.
+- 0.0.17 is the 2026-10-10 fix wave: strict base64 / UTF-8 / JSON decoding (F24), type guards in place of
+  the three casts (F25), no URL echo in `gatewayOrigin` errors (F26), `engines`, CI build and lint (F19,
+  F20), eleven new `proofDecodeRejects` vectors. The 2026-10-09 commits (`ff6256d` Dependabot config,
+  `ed876ba` dev-dependency lockfile bump) did not change `src/`. The consumers below now run the strict
+  decoder (the Worker since its 2026-10-10 deployment).
+- Consumers (verified 2026-10-18 in `repos/*/package.json` and the Worker's lockfile, all `^0.0.17`):
+  `nft-gate/gateway-workers` (imports the decoder and the message derivation; Worker redeployed from `main`
+  on 2026-10-10 against the 2026-10-09 `access_gate` publication and relay gate), `walrus-client`
+  (`fetchChallenge` + `buildAccessProof`), `docs` and `dev`.
   `nft-gate/gateway-rust` mirrors the format and consumes a vendored copy of `vectors.json`; it is kept at
   parity and **not deployed** (decision).
+- Live check 2026-10-10 (Worker redeployed with 0.0.17, `Deploy Workers` run 38077732841, success): a canonical
+  proof token decodes; an unpadded token and a whitespace-split token are refused as `malformed access proof`
+  (the strict decoder is live; F24).
 - Live check 2026-10-09: the paywall e2e against the live dashboard passed with an
   `nft-gate:access:v2` proof built by this package (pass bought on gate `0x316f1bf9…`, consumed, upload
   through the Worker; the indexer shows minted=1 consumed=1).
 
-**Review date:** 2026-10-03; re-verified 2026-10-09; fix wave 2026-10-10
+**Review date:** 2026-10-03; re-verified 2026-10-09; fix wave 2026-10-10; release status 2026-10-18
 **Reviewer:** Internal review
 **Severity ceiling:** Medium — the package holds no funds or keys and makes no authorisation decision.
   However, `decodeAccessProof` and `personalMessage` sit **on the live Workers gateway's verification
   path**, and the message format it defines decides what a user's signature can be replayed for. A bypass
   still requires a gateway decision, so nothing here reaches High on its own.
 **Status:** re-verified 2026-10-09 at `ed876ba` (release `0.0.16`, tag `e114369`); fix wave 2026-10-10 on
-  top of it (release `0.0.17`, commit `f7abef3`, unreleased). Of the 26 findings (F1–F26), 5 are Positive
+  top of it (release `0.0.17`, commit `f7abef3`, released 2026-10-10 and live in the Worker). Of the 26 findings (F1–F26), 5 are Positive
   and 21 carry a disposition: 15 RESOLVED, 5 MITIGATED, 1 ADJUDICATED. Nothing is ACCEPTED-RISK or
   DEFERRED. This supersedes the 2026-10-03 pass, which recorded findings only. The audit lives in the
   package (see *Location* below).
@@ -123,7 +128,7 @@ that were open:
 - **F15, F16** — the response contract is exported, and `vectors.json` is generated, asserted here with an
   independent verifier, published, and consumed by both gateways.
 
-**What changed in the 2026-10-10 fix wave (0.0.17, unreleased).** `decodeAccessProof` is now strict at the
+**What changed in the 2026-10-10 fix wave (0.0.17, released 2026-10-10).** `decodeAccessProof` is now strict at the
 base64, UTF-8 and JSON layers and makes the same decisions as the Rust gateway (F24, the unclosed part of
 F10); eleven new `proofDecodeRejects` vectors pin it in both gateways' suites. The three narrowing casts
 are type guards (F25), `gatewayOrigin` errors no longer echo the URL (F26), `engines.node` is `>=24`
@@ -131,8 +136,9 @@ are type guards (F25), `gatewayOrigin` errors no longer echo the URL (F26), `eng
 
 **Where residual risk remains** (all Low or Info):
 
-1. **Rollout of 0.0.17.** The strict decoder only protects once the Worker pins `^0.0.17` and its vendored
-   vectors are synced; until then the live Workers decoder is the lenient 0.0.16 (F24 residual, not a
+1. **Rollout of 0.0.17 (done 2026-10-10).** The strict decoder protects once the Worker pins `^0.0.17` and its
+   vendored vectors are synced. Both happened and the Worker was redeployed on 2026-10-10, so the live
+   decoder is the strict one (live-checked); before that it was the lenient 0.0.16 (F24 residual, not a
    bypass: the field grammar and every signature check are identical).
 2. **F11, F14, F15, F17, F18 (MITIGATED)** — small remainders: no `cache: 'no-store'`, a bad address or
    an expired challenge still reaches the wallet prompt, walrus-client keeps its own conflict helper with
@@ -254,7 +260,7 @@ Critical / High / Medium / Low / Info / Positive (unchanged across the corpus).
 | `npm run check:vectors` | clean (`vectors.json` equals the generator's output) |
 | `npm run build` | emits `dist/{index,types,challenge,proof,contract}.d.ts`; `decodeAccessProof` now carries its doc comment (F17) |
 | `npm pack --dry-run` | 15 files: `CHANGELOG.md`, `LICENSE`, `README.md`, `package.json`, `vectors.json`, `src/*.ts` (5), `dist/*.d.ts` (5); no tests, config or env files |
-| `npm view @meddleware/nft-gate-client` | 0.0.16 (`latest`); `dist.attestations.provenance.predicateType` = `https://slsa.dev/provenance/v1` |
+| `npm view @meddleware/nft-gate-client` | 0.0.16 (`latest`); `dist.attestations.provenance.predicateType` = `https://slsa.dev/provenance/v1` (2026-10-18: `latest` is 0.0.17, published 2026-10-10T15:14Z, same predicate type) |
 | Decoder probe (`decodeAccessProof` on crafted tokens) | 2026-10-09 (0.0.16): accepted canonical, unpadded, whitespace-split, extra unknown key, invalid UTF-8 inside an unknown key. Rejected: non-string `consumeDigest`. The `consume_digest` key is ignored. (F10, F24). 2026-10-10 (0.0.17): the unpadded, whitespace, invalid-UTF-8 rows are refused; see the differential run in the F24 evidence |
 
 The review left no tracked file changed. `dist/` and `node_modules/` are git-ignored, and the probe script
@@ -709,7 +715,7 @@ unless they set `engine-strict`).
 - Tag-gated (`v*`), with a tag == `package.json` version check.
 - Idempotent publish (registry probe plus a "cannot publish over" tolerance).
 - The npm client is pinned (`npm@11.20.0`).
-- OIDC `--provenance`, with the attestation verified on the registry for 0.0.16.
+- OIDC `--provenance`, with the attestation verified on the registry for 0.0.16 and 0.0.17.
 - `files` whitelist, and pack contents verified (15 files).
 - `sideEffects: false` is accurate: no module has import-time effects.
 - No `overrides`, no `allowScripts`. The only lifecycle script is `prepublishOnly` (declaration build).
@@ -795,7 +801,8 @@ both gateways, and no change to the Rust source:
   through `include_str!`, and it passes unchanged against the new `vectors.json` (run on a scratch copy,
   2026-10-10). Its decoder was not edited.
 - **Rollout:** the strictness reaches the live Worker only when `gateway-workers` pins `^0.0.17` and runs
-  `node scripts/sync-vectors.mjs` (orchestrator step). Clients that build tokens with this package emit
+  `node scripts/sync-vectors.mjs` (orchestrator step; done and deployed 2026-10-10, where a canonical token
+  decoded and an unpadded and a whitespace-split token were refused as `malformed access proof`). Clients that build tokens with this package emit
   canonical tokens, so no legitimate caller is affected.
 
 ### F25 — Narrowing casts at trust boundaries carry no inline justification
@@ -898,8 +905,8 @@ so consumers inherit nothing from this package.
 
 No deviation from the ADR-0001 baseline. `@mysten/sui` is a dev dependency only and is never in the
 published bundle, so TS-M9 (peer declaration) is N/A. Downstream, the first-party consumers
-(`gateway-workers`, `walrus-client`, `docs`) declare `^0.0.16`, which resolves exactly to the latest
-published version.
+(`gateway-workers`, `walrus-client`, `docs`, `dev`) declare `^0.0.17` (2026-10-18; `^0.0.16` on 2026-10-09),
+which resolves exactly to the latest published version.
 
 **SUI_CLIENT lens rows:**
 
@@ -923,7 +930,7 @@ published version.
 | --- | --- | --- |
 | Actions pinned | Yes | SHA pins with version comments in both workflows |
 | Least privilege | Yes | top-level `contents: read`; `id-token: write` only in `publish-npm` |
-| OIDC trusted publishing | Yes | `npm publish --provenance`; registry attestation present for 0.0.16 |
+| OIDC trusted publishing | Yes | `npm publish --provenance`; registry attestation present for 0.0.16 and 0.0.17 |
 | Tag-gated, idempotent publish | Yes | `on: push: tags: v*`; tag/version check; registry probe + conflict tolerance |
 | Container images | N/A | none |
 | Secrets never echoed | Yes | no secrets in either workflow |
@@ -1224,7 +1231,7 @@ AUTH lens:
   floor is F20 (`engines.node` `>=24`).
 - **Coordinated releases.** Every wire change needs this package, both gateways, the vectors and
   walrus-client released together. Pre-v0.2 there is no compatibility window, so a partial rollout
-  breaks uploads until all parts ship. (0.0.16 was rolled out this way on 2026-10-08/09.)
+  breaks uploads until all parts ship. (0.0.16 was rolled out this way on 2026-10-08/09, 0.0.17 on 2026-10-10.)
 - **Dev-toolchain supply chain.** 176 dev packages, including the eslint and vitest ecosystems and the Sui
   SDK. They are not shipped, but they run in CI with publish credentials one job away. The control is the
   `npm audit` gate plus the job split, with `id-token` only in the publish job.
@@ -1283,6 +1290,12 @@ AUTH lens:
     `npm run build` clean; `npm audit` 0; `npm pack --dry-run` 15 files.
   - Section D: only external review (maintainer, `OPERATOR_TASKS.md`) is unticked.
   - Pre-save consistency checklist run.
+- 2026-10-18 — released (0.0.17), consumers bumped (nft-gate/gateway-workers, walrus-client, docs, dev: all
+  `^0.0.17`). `npm view` shows `@meddleware/nft-gate-client` 0.0.17 as `latest`, published 2026-10-10T15:14Z, with
+  SLSA v1 provenance (`dist.attestations`); tag `v0.0.17` at `9f430ff`. The Worker was redeployed from `main`
+  on 2026-10-10 (`Deploy Workers` run 38077732841, success) and checked live: a canonical proof token decodes,
+  an unpadded token and a whitespace-split token are refused as `malformed access proof`. The rollout item of
+  the 2026-10-10 entry is done. Section D: only the external review stays unticked (maintainer-only).
 
 ## Pre-save consistency checklist (this pass)
 
