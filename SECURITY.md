@@ -25,7 +25,7 @@ treated as high severity:
    `nft-gate:access:v2` plus the gateway origin, gate id, network, nonce and (single-use) consume
    digest, and the proof token is `base64(JSON{address,nonce,signature,consumeDigest?})` with fixed
    field order, decoded strictly (canonical padded base64, strict UTF-8, the JSON limits serde_json applies)
-   so both gateways reach identical decisions; both are pinned by the published `vectors.json`, which both gateway implementations
+   so both gateways reach identical decisions (the consume digest is base58 that decodes to exactly 32 bytes; the response status and error body per outcome are pinned too); both are pinned by the published `vectors.json`, which both gateway implementations
    test against. Any change is a breaking change requiring lockstep updates to the gateways and the
    vectors.
 4. **No protocol addresses or secrets are hardcoded** in shipped source, and there are no runtime

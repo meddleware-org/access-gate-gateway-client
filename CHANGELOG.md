@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.18] - 2026-10-22
+
+### Changed (breaking for lenient callers: a few digests that 0.0.17 accepted are now refused)
+
+- `isTransactionDigest` (and so `personalMessage`, `encodeAccessProof`, `decodeAccessProof`) requires a
+  base58 string that decodes to exactly 32 bytes, not just 32-44 base58 characters. A leading `1` counts as
+  a zero byte; 43 characters can be 31 bytes and 44 can be 33. `nft-gate-core` (`is_tx_digest`) applies the
+  same rule.
+- `buildAccessProof` checks the `address` (`0x` + 1-64 hex digits) and the challenge's expiry before asking
+  the wallet to sign, so the user is never prompted for a proof a gateway would refuse. A challenge is
+  expired once the local clock is more than `CHALLENGE_CLOCK_SKEW_MS` (30 s) past `expiresAt`.
+- `fetchChallenge` sends `cache: 'no-store'` and `credentials: 'omit'` (redirects were already refused).
+- `GATEWAY_STATUS` gains `methodNotAllowed` (405) and `loopDetected` (508), which the gateways already emit.
+
+### Added
+
+- `vectors.json` `txDigest` (valid and invalid digests: 32/43/44/45 characters, leading `1`s, `0 O I l`),
+  five digest cases in `proofDecodeRejects` and two in `personalMessageRejects`.
+- `vectors.json` `responses`: the status and `{ error, code? }` body each gateway answers for sixteen
+  outcomes (missing or bad proof, each denial, rate limit, loop, `redeemed` / `leased` conflict, commit
+  failure, lost lease, store outage). Both gateways map every outcome to a stimulus of their own.
+- `CHALLENGE_CLOCK_SKEW_MS` export.
+- Tests: a real local HTTP server that answers 302 / 301 proves the redirect is refused and never followed;
+  signer spies prove the wallet prompt is not reached on a bad address or an expired challenge.
+
 ## [0.0.17] - 2026-10-10
 
 ### Changed (breaking for lenient callers: a few tokens that 0.0.16 accepted are now refused)

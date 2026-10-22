@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { fetchChallenge } from '../src/challenge.js'
 
 afterEach(() => vi.restoreAllMocks())
@@ -117,5 +119,67 @@ describe('fetchChallenge hardening', () => {
     })
     vi.stubGlobal('fetch', vi.fn(async () => new Response(stream, { status: 200 })))
     await expect(fetchChallenge('https://gw.example')).rejects.toThrow(/too large/)
+  })
+})
+
+describe('fetchChallenge request options (F11)', () => {
+  it('never uses an HTTP cache and sends no ambient credentials', async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify({ nonce: 'n', expiresAt: 1 }), { status: 200 }))
+    vi.stubGlobal('fetch', spy)
+    await fetchChallenge('https://gw.example')
+    expect(spy).toHaveBeenCalledOnce()
+    const init = (spy.mock.calls[0] as unknown as [string, RequestInit])[1]
+    expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' })
+    expect(init.signal).toBeInstanceOf(AbortSignal)
+  })
+})
+
+describe('fetchChallenge against a real HTTP server', () => {
+  beforeEach(() => vi.unstubAllGlobals()) // the real fetch, not an earlier test's stub
+
+  async function serve(handler: Parameters<typeof createServer>[1]) {
+    const hits: string[] = []
+    const server = createServer((req, res) => {
+      hits.push(`${req.method} ${req.url}`)
+      handler?.(req, res)
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+    return { url, hits, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
+  }
+
+  it('answers a challenge over real HTTP', async () => {
+    const s = await serve((_req, res) => res.setHeader('content-type', 'application/json').end(JSON.stringify({ nonce: 'real', expiresAt: 5 })))
+    try {
+      expect(await fetchChallenge(s.url)).toEqual({ nonce: 'real', expiresAt: 5 })
+      expect(s.hits).toEqual(['GET /v1/challenge'])
+    } finally {
+      await s.close()
+    }
+  })
+
+  it('rejects a 302 and never follows it', async () => {
+    const s = await serve((req, res) => {
+      if (req.url === '/v1/challenge') return res.writeHead(302, { location: '/elsewhere' }).end()
+      res.setHeader('content-type', 'application/json').end(JSON.stringify({ nonce: 'stolen', expiresAt: 5 }))
+    })
+    try {
+      await expect(fetchChallenge(s.url)).rejects.toThrow()
+      expect(s.hits).toEqual(['GET /v1/challenge']) // the redirect target was never requested
+    } finally {
+      await s.close()
+    }
+  })
+
+  it('rejects a 301 to another origin without contacting it', async () => {
+    const other = await serve((_req, res) => res.end(JSON.stringify({ nonce: 'x', expiresAt: 1 })))
+    const s = await serve((_req, res) => res.writeHead(301, { location: `${other.url}/v1/challenge` }).end())
+    try {
+      await expect(fetchChallenge(s.url)).rejects.toThrow()
+      expect(other.hits).toEqual([])
+    } finally {
+      await s.close()
+      await other.close()
+    }
   })
 })

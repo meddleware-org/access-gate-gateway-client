@@ -10,6 +10,8 @@ export const GATEWAY_STATUS = {
   missingProof: 401,
   /** The proof was refused (bad signature, expired nonce, no usable pass, gate paused, no consume). */
   denied: 403,
+  /** The method is not forwarded (or not allowed on a public path). */
+  methodNotAllowed: 405,
   /** A single-use consume conflicts: see {@link GatewayConflictCode}. */
   conflict: 409,
   /** The request body exceeds the gateway's cap. */
@@ -21,6 +23,8 @@ export const GATEWAY_STATUS = {
   stateUnavailable: 503,
   /** The upstream did not answer in time. */
   gatewayTimeout: 504,
+  /** The request already carries this gateway's `Via` marker: it looped back through the gateway. */
+  loopDetected: 508,
 } as const
 
 /** `redeemed`: the consume already paid for an upload. `leased`: an upload for it is in progress. */

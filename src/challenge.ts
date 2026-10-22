@@ -47,8 +47,10 @@ async function readCapped(res: Response): Promise<string> {
  * Fetch a fresh challenge from a gateway's `GET /v1/challenge` endpoint.
  *
  * The request is aborted after `timeoutMs` (default 10 s) or when `signal` aborts, whichever comes
- * first. Redirects are refused (a gateway that redirects is not the gateway the caller chose), and
- * the body is cut off at 4 KiB while it is being read.
+ * first. Redirects are refused (a gateway that redirects is not the gateway the caller chose), the
+ * response is never taken from or stored in an HTTP cache (`cache: 'no-store'`), no cookies or other
+ * ambient credentials are sent (`credentials: 'omit'`), and the body is cut off at 4 KiB while it is
+ * being read.
  *
  * @throws {Error} if the host is not an https URL (http is allowed for loopback hosts only).
  * @throws {Error} if the request fails, times out, is redirected, or the gateway returns a non-2xx status.
@@ -62,7 +64,8 @@ export async function fetchChallenge(
   const url = challengeUrl(gatewayHost)
   const timeout = AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout
-  const res = await fetch(url, { signal, redirect: 'error' })
+  // A nonce must be fresh and anonymous: never answered from a cache, never sent with ambient credentials.
+  const res = await fetch(url, { signal, redirect: 'error', cache: 'no-store', credentials: 'omit' })
   if (!res.ok) {
     await res.body?.cancel()
     throw new Error(`challenge request failed: ${res.status}`)

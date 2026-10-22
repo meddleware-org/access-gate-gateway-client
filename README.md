@@ -30,12 +30,12 @@ const token = await buildAccessProof({ address, challenge, sign, gateway, gateId
 
 | Export | Purpose |
 | --- | --- |
-| `fetchChallenge(gateway, opts?)` | `GET /v1/challenge` → `{ nonce, expiresAt }`; https only (loopback http allowed), no redirects, 4 KiB body cap, aborts after `opts.timeoutMs` (10 s) or on `opts.signal` |
+| `fetchChallenge(gateway, opts?)` | `GET /v1/challenge` → `{ nonce, expiresAt }`; https only (loopback http allowed), no redirects, `cache: 'no-store'`, `credentials: 'omit'`, 4 KiB body cap, aborts after `opts.timeoutMs` (10 s) or on `opts.signal` |
 | `personalMessage(context)` | the exact bytes the wallet signs (see below); throws on any non-canonical field |
-| `buildAccessProof({ address, challenge, sign, gateway, gateId, network, consumeDigest? })` | sign the audience-bound message and return the Bearer token |
+| `buildAccessProof({ address, challenge, sign, gateway, gateId, network, consumeDigest? })` | sign the audience-bound message and return the Bearer token; refuses a malformed address or an expired challenge (30 s clock-skew allowance, `CHALLENGE_CLOCK_SKEW_MS`) before the wallet prompt |
 | `encodeAccessProof(proof)` / `decodeAccessProof(token)` | base64(JSON) token ↔ `AccessProof`; both enforce the same field grammar; the decoder also enforces a 4 KiB cap and strict base64 / UTF-8 / JSON (see below) |
-| `gatewayOrigin(url)`, `isNonce(s)`, `isTransactionDigest(s)` | canonical origin; nonce and base58-digest shape checks |
-| `GATEWAY_STATUS`, `GATEWAY_CONFLICT_CODES`, `parseGatewayError(body)` | the gateways' response contract (`409` carries `code: redeemed \| leased`) |
+| `gatewayOrigin(url)`, `isNonce(s)`, `isTransactionDigest(s)` | canonical origin; nonce check; transaction digest check (base58 that decodes to exactly 32 bytes) |
+| `GATEWAY_STATUS`, `GATEWAY_CONFLICT_CODES`, `parseGatewayError(body)` | the gateways' response contract (`409` carries `code: redeemed \| leased`); the status and error text per outcome are pinned in `vectors.json` `responses` |
 | types `Challenge`, `AccessProof`, `AccessMessageContext`, `SuiNetwork`, `PersonalMessageSigner` | wire types |
 | `@meddleware/nft-gate-client/vectors.json` | the shared conformance vectors |
 
@@ -50,7 +50,7 @@ const token = await buildAccessProof({ address, challenge, sign, gateway, gateId
   gate:<0x + 64 lower-case hex>
   network:<localnet|devnet|testnet|mainnet>
   nonce:<nonce>
-  consume:<base58 digest>      (single-use gateways only)
+  consume:<base58 digest>      (single-use gateways only; 32 bytes once decoded)
   ```
 
   The gateway rebuilds it from its own origin, gate and network, so a signature is useless at any
@@ -62,7 +62,7 @@ const token = await buildAccessProof({ address, challenge, sign, gateway, gateId
   no number that overflows (`1e999`). Only whitespace at either end of the token is ignored.
 
 Both gateways in [nft-gate](https://github.com/meddleware-org/nft-gate) verify exactly this format;
-`vectors.json` pins it (`npm run gen:vectors` regenerates it, `npm run check:vectors` checks it is current).
+`vectors.json` pins it, including the consume-digest rule (`txDigest`) and the status and body each gateway answers per outcome (`responses`) (`npm run gen:vectors` regenerates it, `npm run check:vectors` checks it is current).
 
 ## Development
 

@@ -10,6 +10,7 @@
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 import { Secp256k1Keypair } from '@mysten/sui/keypairs/secp256k1'
 import { Secp256r1Keypair } from '@mysten/sui/keypairs/secp256r1'
+import { toBase58 } from '@mysten/sui/utils'
 import { blake2b } from '@noble/hashes/blake2.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { p256 } from '@noble/curves/nist.js'
@@ -34,6 +35,39 @@ const OWNERSHIP = {
 const SINGLE_USE = { ...OWNERSHIP, consumeDigest: DIGEST }
 const NONCE = OWNERSHIP.nonce
 
+// ── transaction digests ──────────────────────────────────────────────────────────────────────
+// A Sui transaction digest is base58 (Bitcoin alphabet) that decodes to exactly 32 bytes. The shape alone
+// (32-44 characters of the alphabet) is not enough: 43 characters can be 31 bytes and 44 can be 33, and a
+// leading `1` is a zero byte. Valid digests are built from bytes with the SDK's encoder, so the generator
+// does not share code with `src/`.
+const bytesOf = (len, fill = 0xff, head = []) => Uint8Array.from([...head, ...new Uint8Array(len - head.length).fill(fill)])
+const flip = (d, at, ch) => d.slice(0, at) + ch + d.slice(at + 1)
+const txDigestValid = [
+  ['golden digest (44 characters)', DIGEST],
+  ['32 zero bytes: 32 leading 1s, the shortest valid digest', toBase58(new Uint8Array(32))],
+  ['one leading zero byte, then 31 bytes of 0xff (44 characters)', toBase58(bytesOf(32, 0xff, [0]))],
+  ['smallest value without a leading zero byte (0x01, then zeros)', toBase58(bytesOf(32, 0, [1]))],
+  ['all 0xff (44 characters)', toBase58(bytesOf(32, 0xff))],
+  ['43 characters that decode to 32 bytes (all z)', 'z'.repeat(43)],
+].map(([name, digest]) => ({ name, digest }))
+const txDigestInvalid = [
+  ['empty', ''],
+  ['31 characters (31 zero bytes)', '1'.repeat(31)],
+  ['33 zero bytes', '1'.repeat(33)],
+  ['45 characters', 'z'.repeat(45)],
+  ['43 characters that decode to 31 bytes', toBase58(bytesOf(31, 0xff))],
+  ['44 characters that decode to 33 bytes (all z)', 'z'.repeat(44)],
+  ['32 characters that decode to 24 bytes', '2'.repeat(32)],
+  ['a leading 1 adds a zero byte: 1 + 43 z decode to 33 bytes', '1' + 'z'.repeat(43)],
+  ['golden digest with a 0 (not in the alphabet)', flip(DIGEST, 5, '0')],
+  ['golden digest with an O (not in the alphabet)', flip(DIGEST, 5, 'O')],
+  ['golden digest with an I (not in the alphabet)', flip(DIGEST, 5, 'I')],
+  ['golden digest with an l (not in the alphabet)', flip(DIGEST, 5, 'l')],
+  ['golden digest with a non-base58 symbol', flip(DIGEST, 5, '+')],
+  ['golden digest with a non-ASCII letter', flip(DIGEST, 5, 'é')],
+  ['hex-looking 64 characters', 'a'.repeat(64)],
+].map(([name, digest]) => ({ name, digest }))
+
 const messageCase = (name, context) => ({
   name,
   context,
@@ -55,6 +89,8 @@ const personalMessageRejects = [
   ['nonce: empty', { ...OWNERSHIP, nonce: '' }],
   ['nonce: 129 characters', { ...OWNERSHIP, nonce: 'a'.repeat(129) }],
   ['consume digest: not base58', { ...OWNERSHIP, consumeDigest: 'DIGEST-1' }],
+  ['consume digest: 43 characters that decode to 31 bytes', { ...OWNERSHIP, consumeDigest: toBase58(bytesOf(31, 0xff)) }],
+  ['consume digest: 44 characters that decode to 33 bytes', { ...OWNERSHIP, consumeDigest: 'z'.repeat(44) }],
 ].map(([name, context]) => ({ name, context }))
 
 // ── proof tokens ─────────────────────────────────────────────────────────────────────────────
@@ -95,6 +131,11 @@ const proofDecodeRejects = [
   ['consume digest not base58', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: 'DIGEST-1' })],
   ['consume digest empty', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: '' })],
   ['consume digest not a string', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: 7 })],
+  ['consume digest decodes to 31 bytes (43 characters)', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: toBase58(bytesOf(31, 0xff)) })],
+  ['consume digest decodes to 33 bytes (44 characters)', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: 'z'.repeat(44) })],
+  ['consume digest with a leading 1 that makes it 33 bytes', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: '1' + 'z'.repeat(43) })],
+  ['consume digest with a 0 (not in the base58 alphabet)', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: flip(DIGEST, 5, '0') })],
+  ['consume digest with an l (not in the base58 alphabet)', token({ address: '0x1', nonce: 'n', signature: 'AAAA', consumeDigest: flip(DIGEST, 5, 'l') })],
   ['JSON array', token(['0x1'])],
   ['JSON null', token(null)],
   // The base64 / UTF-8 / JSON layers underneath the field grammar. The Rust gateway refuses each of these
@@ -192,9 +233,52 @@ const zip215 = {
   expect: true,
 }
 
+// ── gateway responses ────────────────────────────────────────────────────────────────────────
+// What every gateway answers for each outcome: the status and the `{ error, code? }` body of
+// `src/contract.ts`. `outcome` is a closed set of names; each implementation maps every name to a
+// stimulus of its own (a decision, a store result, a request) and asserts the answer, and fails on a name
+// it does not know. Error texts are part of the contract: both gateways emit exactly these.
+const STATUS = {
+  missingProof: 401,
+  denied: 403,
+  methodNotAllowed: 405,
+  conflict: 409,
+  bodyTooLarge: 413,
+  rateLimited: 429,
+  badGateway: 502,
+  stateUnavailable: 503,
+  gatewayTimeout: 504,
+  loopDetected: 508,
+}
+const response = (outcome, status, error, code) => ({ outcome, status, error, ...(code ? { code } : {}) })
+const responses = {
+  description:
+    'The gateways\' answer for each outcome: HTTP status and the JSON body { error, code? } (`code` only on a 409 conflict). `statuses` is GATEWAY_STATUS, `conflictCodes` is GATEWAY_CONFLICT_CODES, and each case names an `outcome` every implementation must be able to produce and then answer exactly so. Upstream transport faults (413, 504, an upstream 502) are not listed: they depend on the upstream, not on the protocol.',
+  statuses: STATUS,
+  conflictCodes: ['redeemed', 'leased'],
+  cases: [
+    response('missing-proof', 401, 'missing access proof'),
+    response('bad-proof', 403, 'malformed access proof'),
+    response('bad-signature', 403, 'signature does not recover address'),
+    response('nonce-invalid', 403, 'challenge nonce invalid, expired, or already used'),
+    response('not-owner', 403, 'address does not hold the required access NFT'),
+    response('consume-missing', 403, 'no matching single-use consume for this address'),
+    response('gate-paused', 403, 'the gate is paused'),
+    response('chain-error', 502, 'on-chain verification failed'),
+    response('state-unavailable', 503, 'gateway state unavailable'),
+    response('rate-limited', 429, 'rate limit exceeded'),
+    response('method-not-allowed', 405, 'method not allowed'),
+    response('loop-detected', 508, 'loop detected'),
+    response('consume-redeemed', 409, 'this consume has already been redeemed for an upload', 'redeemed'),
+    response('consume-leased', 409, 'an upload for this consume is already in progress', 'leased'),
+    response('commit-failed', 502, 'redemption commit failed'),
+    response('lease-lost', 502, 'redemption lease lost'),
+  ],
+}
+
 const out = {
   description:
-    'Conformance vectors shared by the nft-gate gateways and clients (protocol nft-gate:access:v2). `personalMessage.cases` are the exact signed bytes for a context; `personalMessageRejects` are contexts no implementation may sign or accept; `signatures` are real Sui personal-message signatures that must verify against the message rebuilt from `context`; `audienceMismatch` are valid signatures whose verifier-side context differs in one bound field and must be refused; `negativeSignatures` must be refused; `zip215` pins ed25519 to ZIP-215 (Sui\'s rule); `proofDecode*` pin the token grammar; `addressNormalization` pins canonical addresses. Regenerate with: node scripts/gen-vectors.mjs > vectors.json',
+    'Conformance vectors shared by the nft-gate gateways and clients (protocol nft-gate:access:v2). `personalMessage.cases` are the exact signed bytes for a context; `personalMessageRejects` are contexts no implementation may sign or accept; `signatures` are real Sui personal-message signatures that must verify against the message rebuilt from `context`; `audienceMismatch` are valid signatures whose verifier-side context differs in one bound field and must be refused; `negativeSignatures` must be refused; `zip215` pins ed25519 to ZIP-215 (Sui\'s rule); `proofDecode*` pin the token grammar; `txDigest` pins the consume digest rule (base58 that decodes to exactly 32 bytes); `responses` pins the status and error body each gateway answers per outcome; `addressNormalization` pins canonical addresses. Regenerate with: node scripts/gen-vectors.mjs > vectors.json',
   version: VERSION,
   personalMessage: { cases: [messageCase('ownership gateway', OWNERSHIP), messageCase('single-use gateway', SINGLE_USE)] },
   personalMessageRejects,
@@ -203,6 +287,12 @@ const out = {
     description: 'Tokens every decoder must reject before verification: size, ASCII, the field grammar, and the base64 (canonical padded standard alphabet, no inner whitespace), UTF-8 (strict, no BOM) and JSON (nesting depth 127, no unpaired surrogate escape, no overflowing number) layers underneath it.',
     cases: proofDecodeRejects,
   },
+  txDigest: {
+    description: 'A Sui transaction digest is base58 (Bitcoin alphabet: no 0 O I l) that decodes to exactly 32 bytes; a leading 1 is a zero byte. Every implementation accepts `valid` and refuses `invalid`.',
+    valid: txDigestValid,
+    invalid: txDigestInvalid,
+  },
+  responses,
   addressNormalization: {
     description:
       'Both gateways canonicalise the proof address before comparing to on-chain owners: strip 0x, lower-case, zero-pad to 64 hex, re-prefix 0x.',

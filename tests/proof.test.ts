@@ -8,6 +8,7 @@ import {
   buildAccessProof,
   isTransactionDigest,
   isNonce,
+  CHALLENGE_CLOCK_SKEW_MS,
 } from '../src/proof.js'
 import type { AccessMessageContext } from '../src/types.js'
 
@@ -229,11 +230,64 @@ describe('buildAccessProof', () => {
   })
 })
 
+describe('buildAccessProof never prompts the wallet for a proof that cannot work (F14)', () => {
+  const base = { address: '0xabc', challenge: { nonce: 'xyz', expiresAt: Date.now() + 60_000 }, gateway: 'https://gateway.example/', gateId: CTX.gateId, network: 'testnet' as const }
+  const signer = () => vi.fn(async () => ({ signature: 'QkFTRTY0' }))
+
+  it('refuses a malformed address before the prompt', async () => {
+    const sign = signer()
+    for (const address of ['', 'abc', '0x', '0xzz', '0x' + '1'.repeat(65), '0xé1', ' 0xabc']) {
+      await expect(buildAccessProof({ ...base, sign, address })).rejects.toThrow(/address|ASCII/)
+    }
+    expect(sign).not.toHaveBeenCalled()
+  })
+
+  it('refuses an expired challenge before the prompt, with a documented skew allowance', async () => {
+    const sign = signer()
+    const at = (expiresAt: number) => ({ ...base, sign, challenge: { nonce: 'xyz', expiresAt } })
+    await expect(buildAccessProof(at(Date.now() - CHALLENGE_CLOCK_SKEW_MS - 5_000))).rejects.toThrow(/expired/)
+    await expect(buildAccessProof(at(1))).rejects.toThrow(/expired/)
+    for (const expiresAt of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(buildAccessProof(at(expiresAt))).rejects.toThrow(/expiry/)
+    }
+    expect(sign).not.toHaveBeenCalled()
+    // Just expired by the local clock, within the skew: the gateway's clock decides, so it still signs.
+    await expect(buildAccessProof(at(Date.now() - CHALLENGE_CLOCK_SKEW_MS + 5_000))).resolves.toEqual(expect.any(String))
+    expect(sign).toHaveBeenCalledOnce()
+  })
+
+  it('allows a 30 second skew and no more', () => {
+    expect(CHALLENGE_CLOCK_SKEW_MS).toBe(30_000)
+  })
+
+  it('does not echo the address or the expiry in the error', async () => {
+    const sign = signer()
+    const bad = '0xSECRET-ADDRESS'
+    const message = await buildAccessProof({ ...base, sign, address: bad }).then(
+      () => '',
+      (e: Error) => e.message,
+    )
+    expect(message).toMatch(/address/)
+    expect(message).not.toContain('SECRET')
+  })
+})
+
 describe('shape predicates', () => {
   it('isTransactionDigest accepts base58 digests only', () => {
     expect(isTransactionDigest(DIGEST)).toBe(true)
     expect(isTransactionDigest('0OIl'.repeat(10))).toBe(false)
     expect(isTransactionDigest('')).toBe(false)
+  })
+  it('isTransactionDigest requires exactly 32 decoded bytes (F18)', () => {
+    expect(isTransactionDigest('1'.repeat(32))).toBe(true) // 32 zero bytes
+    expect(isTransactionDigest('1'.repeat(31))).toBe(false)
+    expect(isTransactionDigest('1'.repeat(33))).toBe(false)
+    expect(isTransactionDigest('z'.repeat(43))).toBe(true) // 58^43 - 1 fits in 32 bytes
+    expect(isTransactionDigest('z'.repeat(44))).toBe(false) // 33 bytes
+    expect(isTransactionDigest('z'.repeat(45))).toBe(false)
+    expect(isTransactionDigest('1' + 'z'.repeat(43))).toBe(false) // a leading 1 is a zero byte: 33 bytes
+    expect(isTransactionDigest('1' + 'z'.repeat(42))).toBe(true) // 1 zero byte + 31 bytes
+    for (const ch of ['0', 'O', 'I', 'l']) expect(isTransactionDigest(DIGEST.slice(0, 5) + ch + DIGEST.slice(6))).toBe(false)
   })
   it('isNonce accepts the challenge alphabet only', () => {
     expect(isNonce('aZ09._~-')).toBe(true)

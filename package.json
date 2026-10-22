@@ -1,6 +1,6 @@
 {
   "name": "@meddleware/nft-gate-client",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "homepage": "https://docs.meddleware.co.uk/blockchain/sui/access-gate/",
   "type": "module",
   "description": "The nft-gate wire protocol, client side: challenge fetching, the signed personal message and access-proof encoding. No runtime dependencies.",

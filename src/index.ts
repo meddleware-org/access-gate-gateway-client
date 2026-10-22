@@ -19,6 +19,7 @@ export {
   buildAccessProof,
   isTransactionDigest,
   isNonce,
+  CHALLENGE_CLOCK_SKEW_MS,
 } from './proof.js'
 export type { PersonalMessageSigner } from './proof.js'
 export { GATEWAY_STATUS, GATEWAY_CONFLICT_CODES, parseGatewayError } from './contract.js'
