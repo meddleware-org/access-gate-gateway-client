@@ -29,10 +29,10 @@
   F20), eleven new `proofDecodeRejects` vectors. The 2026-10-09 commits (`ff6256d` Dependabot config,
   `ed876ba` dev-dependency lockfile bump) did not change `src/`. The consumers below now run the strict
   decoder (the Worker since its 2026-10-10 deployment).
-- 0.0.18 (2026-10-22, committed locally, not tagged or published): `isTransactionDigest` decodes the base58 to exactly 32 bytes (F18), `buildAccessProof`
+- 0.0.18 (2026-10-22, released: tag `v0.0.18` = `10404c4`, npm `latest` 0.0.18, the `Publish (npm)` run succeeded): `isTransactionDigest` decodes the base58 to exactly 32 bytes (F18), `buildAccessProof`
   checks the address and the challenge expiry before the wallet prompt (F14), `fetchChallenge` sends `cache: 'no-store'` and `credentials: 'omit'` and a real 302
-  is proven refused (F11), and `vectors.json` gains `txDigest` and `responses` (F15, F18). Consumers move to `^0.0.18` after the release; **`nft-gate` CI cannot pass
-  until 0.0.18 is on npm** (its `sync-vectors.mjs --check` compares with the published package).
+  is proven refused (F11), and `vectors.json` gains `txDigest` and `responses` (F15, F18). Consumers move to `^0.0.18` after the release; `nft-gate` took it in 0.0.28 and walrus-client in 0.0.30
+  (below, 2026-10-22 close-out).
 - Consumers (verified 2026-10-18 in `repos/*/package.json` and the Worker's lockfile, all `^0.0.17`):
   `nft-gate/gateway-workers` (imports the decoder and the message derivation; Worker redeployed from `main`
   on 2026-10-10 against the 2026-10-09 `access_gate` publication and relay gate), `walrus-client`
@@ -54,7 +54,7 @@
   still requires a gateway decision, so nothing here reaches High on its own.
 **Status:** re-verified 2026-10-09 at `ed876ba` (release `0.0.16`, tag `e114369`); fix wave 2026-10-10 on
   top of it (release `0.0.17`, commit `f7abef3`, released 2026-10-10 and live in the Worker); the five remaining residuals closed
-  2026-10-22 in `0.0.18` (committed locally, unreleased). Of the 26 findings (F1–F26), 5 are Positive
+  2026-10-22 in `0.0.18` (released 2026-10-22, tag `v0.0.18`). Of the 26 findings (F1–F26), 5 are Positive
   and 21 carry a disposition: 20 RESOLVED, 1 ADJUDICATED (F11, F14, F15, F17 and F18 moved from MITIGATED to RESOLVED in 0.0.18). Nothing is
   MITIGATED, ACCEPTED-RISK or DEFERRED. This supersedes the 2026-10-03 pass, which recorded findings only. The audit lives in the
   package (see *Location* below).
@@ -139,7 +139,7 @@ F10); eleven new `proofDecodeRejects` vectors pin it in both gateways' suites. T
 are type guards (F25), `gatewayOrigin` errors no longer echo the URL (F26), `engines.node` is `>=24`
 (F20), and CI builds the declarations and lints before publish (F19).
 
-**What changed in 0.0.18 (2026-10-22, committed locally, unreleased).** The five MITIGATED residuals are closed. `isTransactionDigest`
+**What changed in 0.0.18 (2026-10-22, released as `v0.0.18`).** The five MITIGATED residuals are closed. `isTransactionDigest`
 requires base58 that decodes to exactly 32 bytes (F18; the core and the TypeScript Worker apply the same rule). `buildAccessProof` refuses a malformed address or
 an expired challenge (30 s clock-skew allowance) before the wallet is asked to sign (F14). `fetchChallenge` sets `cache: 'no-store'` and `credentials: 'omit'`, and a
 test against a real local HTTP server proves a 302 is refused and not followed (F11). The vectors gain `txDigest` and `responses` (the status and body of sixteen
@@ -1325,6 +1325,11 @@ AUTH lens:
   - Section D: only external review (maintainer, `OPERATOR_TASKS.md`) is unticked. Counts: 20 RESOLVED, 1 ADJUDICATED, 5 Positive.
   - Not verified here: browser and workerd behaviour of `redirect: 'error'` / `cache: 'no-store'` (Node's fetch only); the npm release and the CI of `nft-gate` (which needs 0.0.18 published first).
   - Pre-save consistency checklist run.
+
+- 2026-10-22 (audit close-out) — release status and consumers; no code change.
+  - 0.0.18 is released (tag `v0.0.18` = `10404c4`, npm `latest` 0.0.18, `Publish (npm)` succeeded). Consumers on `^0.0.18`: `nft-gate` 0.0.28 (the TypeScript Worker, `gateway-workers`; released as `v0.0.28`) and walrus-client 0.0.30 (and through it walrus-relay 0.1.33, walrus-ui 0.1.61, seal-ui 0.0.40, token-deployer-ui 0.0.38).
+  - **The F14 rule exposed a consumer bug, fixed in the consumer:** walrus-client's gated flow passed a synthetic `expiresAt: 0` to `buildAccessProof`; 0.0.18 refuses an expired challenge before the wallet prompt, so the flow failed. walrus-client 0.0.30 passes the gateway's real challenge expiry (walrus-client audit F26, regression test). This is the intended behaviour of F14 (the check catches a caller that does not hold a real challenge); no change here.
+  - Verified read-only: F15 adoption (`walrus-client/src/flow.ts:16` imports `GATEWAY_STATUS` and `parseGatewayError`; line 102 reads the conflict through them) and F17 (`walrus-relay/package.json` description names `@meddleware/walrus-client` and `@meddleware/access-gate-client`, not this package); both dispositions stand RESOLVED. Counts unchanged (20 RESOLVED, 1 ADJUDICATED, 5 Positive).
 
 ## Pre-save consistency checklist (this pass)
 
