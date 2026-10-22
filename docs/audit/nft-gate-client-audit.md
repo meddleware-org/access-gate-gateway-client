@@ -489,7 +489,7 @@ gateways. The base64-layer rows were left lenient in 0.0.16 and closed in 0.0.17
 
 ### F11 — `fetchChallenge` follows redirects and may serve a cached nonce
 
-**Severity:** Low   **Disposition:** RESOLVED (redirects refused in 0.0.16; `cache: 'no-store'` and `credentials: 'omit'` set and a real 302 proven refused in 0.0.18; commit pending)
+**Severity:** Low   **Disposition:** RESOLVED (redirects refused in 0.0.16; `cache: 'no-store'` and `credentials: 'omit'` set and a real 302 proven refused in 0.0.18; commit 53b81cd)
 **Where:** `src/challenge.ts:65-68` (`fetch(url, { signal, redirect: 'error', cache: 'no-store', credentials: 'omit' })`).
 
 **Issue:**
@@ -548,7 +548,7 @@ is pinned by these tests and by each gateway's own tests (both emit `{ nonce, ex
 
 ### F14 — The encode side does not enforce what the decode side requires
 
-**Severity:** Low   **Disposition:** RESOLVED (encode rules in 0.0.16; address and expiry checked before the wallet prompt in 0.0.18; commit pending)
+**Severity:** Low   **Disposition:** RESOLVED (encode rules in 0.0.16; address and expiry checked before the wallet prompt in 0.0.18; commit 53b81cd)
 **Where:** `src/proof.ts` `encodeAccessProof` and `buildAccessProof` (`requireAddress`, the expiry check, `CHALLENGE_CLOCK_SKEW_MS`).
 
 **Issue:** `buildAccessProof` asked the wallet to sign without validating its inputs, and
@@ -573,7 +573,7 @@ is pinned by these tests and by each gateway's own tests (both emit `{ nonce, ex
 
 ### F15 — The protocol's response contract is not defined in the protocol package
 
-**Severity:** Low   **Disposition:** RESOLVED (contract defined, exported and tested in 0.0.16; consumer adoption verified 2026-10-22; `responses` vectors in 0.0.18; commit pending)
+**Severity:** Low   **Disposition:** RESOLVED (contract defined, exported and tested in 0.0.16; consumer adoption verified 2026-10-22; `responses` vectors in 0.0.18; commit 53b81cd)
 **Where:**
 
 - `src/contract.ts` (new in 0.0.16): `GATEWAY_STATUS` (`:8`), `GATEWAY_CONFLICT_CODES` (`:27`),
@@ -657,7 +657,7 @@ one-line edit in `walrus-relay` (read-only check from here). Nothing changes beh
 
 ### F18 — `isTransactionDigest` checks shape only, not the decoded length
 
-**Severity:** Info   **Disposition:** RESOLVED (digest shape enforced at decode and message time in 0.0.16; exact decoded length in 0.0.18, with the same rule in `nft-gate-core`; commit pending)
+**Severity:** Info   **Disposition:** RESOLVED (digest shape enforced at decode and message time in 0.0.16; exact decoded length in 0.0.18, with the same rule in `nft-gate-core`; commit 53b81cd)
 **Where:** `src/proof.ts` (`TX_DIGEST` prefilter, `base58DecodedLength`, `isTransactionDigest`).
 
 **Issue:** Any 32–44-character base58 string passed, including strings that decode to fewer or more than
