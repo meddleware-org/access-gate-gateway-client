@@ -1,10 +1,10 @@
-# AGENTS.md — @meddleware/nft-gate-client
+# AGENTS.md — @meddleware/access-gate-gateway-client
 
 ## Package identity
 
 | Field | Value |
 | --- | --- |
-| npm name | `@meddleware/nft-gate-client` |
+| npm name | `@meddleware/access-gate-gateway-client` |
 | Licence | 0BSD |
 | Build | declaration-only (`tsc -p tsconfig.build.json` → `dist/*.d.ts`); ships TS source |
 | Runtime dependencies | none |
@@ -26,7 +26,7 @@ tests/          vitest unit tests, incl. vectors.json verified with an independe
 ## Rules
 
 - The wire format (`nft-gate:access:v2` message, base64(JSON) proof, field order) is shared with both
-  gateways in `meddleware-org/nft-gate` and pinned by `vectors.json` — change them together.
+  gateways in `meddleware-org/access-gate-gateway` and pinned by `vectors.json` — change them together.
 - `access_gate` builders/reads belong in `@meddleware/access-gate-client`, not here.
 - No runtime dependencies; no hardcoded addresses; no secrets.
 

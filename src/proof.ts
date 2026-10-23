@@ -53,7 +53,7 @@ function base58DecodedLength(s: string): number {
 /**
  * True iff `s` is a Sui transaction digest: base58 (Bitcoin alphabet) that decodes to exactly 32 bytes.
  * A 43-character string can decode to 31 bytes and a 44-character one to 33, so the shape alone is not
- * enough; a leading `1` stands for a zero byte. Mirrored by `is_tx_digest` in `nft-gate-core`.
+ * enough; a leading `1` stands for a zero byte. Mirrored by `is_tx_digest` in `access-gate-gateway-core`.
  */
 export function isTransactionDigest(s: string): boolean {
   return TX_DIGEST.test(s) && base58DecodedLength(s) === TX_DIGEST_BYTES

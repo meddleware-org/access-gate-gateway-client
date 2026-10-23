@@ -1,8 +1,8 @@
 /**
- * `@meddleware/nft-gate-client` — the nft-gate wire protocol, client side.
+ * `@meddleware/access-gate-gateway-client` — the access-gate gateway wire protocol, client side.
  *
  * Challenge fetching, the audience-bound message a wallet signs, access-proof encoding/decoding and
- * the gateways' response contract — the one contract shared with both nft-gate gateways. The
+ * the gateways' response contract — the one contract shared with both access-gate gateways. The
  * conformance vectors both gateways test against are published as `vectors.json`. No runtime
  * dependencies. Building `access_gate` transactions and reading gates/NFTs:
  * `@meddleware/access-gate-client`.

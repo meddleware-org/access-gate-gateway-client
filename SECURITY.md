@@ -2,13 +2,13 @@
 
 ## Scope
 
-This policy covers security issues in the `@meddleware/nft-gate-client` package source
+This policy covers security issues in the `@meddleware/access-gate-gateway-client` package source
 (`src/**`) — the access-proof builder/encoder/decoder (`src/proof.ts`) and the challenge helper.
 `access_gate` transaction builders and reads are `@meddleware/access-gate-client` (its own policy).
 
 It does not cover:
 
-- The `nft-gate` gateways that **verify** proofs (see that repo's `SECURITY.md`) — this client
+- The access-gate gateways that **verify** proofs (see that repo's `SECURITY.md`) — this client
   builds and signs proofs but verifies nothing
 - The `access-gate-sui` on-chain package (see that repo's `SECURITY.md`)
 - The caller-supplied wallet/signer and gateway host (both injected)
@@ -35,7 +35,7 @@ treated as high severity:
 
 > Note on address canonicalization: the proof `address` field is emitted **verbatim** from the
 > caller (not normalized). Gateways must normalize both the proof address and the on-chain sender
-> before comparison. See the corpus audit's cross-reference (nft-gate F1 / nft-gate-client F1).
+> before comparison. See the corpus audit's cross-reference (access-gate-gateway F1 / access-gate-gateway-client F1).
 
 ## Supported versions
 

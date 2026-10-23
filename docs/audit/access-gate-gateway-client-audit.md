@@ -1,10 +1,10 @@
-# Security Audit — `nft-gate-client`
+# Security Audit — `access-gate-gateway-client`
 
 **Classification:** Internal security review
-**Project:** nft-gate-client  (`@meddleware/nft-gate-client` — the client side of the nft-gate wire
+**Project:** access-gate-gateway-client  (`@meddleware/access-gate-gateway-client` — the client side of the nft-gate wire
   protocol: challenge fetching, the audience-bound personal message a wallet signs, access-proof
   encoding/decoding, the gateways' response contract, and the published conformance vectors; imported by
-  the Workers gateway and by walrus-client)
+  the Workers gateway and by walrus-storage-client)
 **Project type:** TS SDK (npm package, ships TypeScript source + declaration-only build)
 **Template:** AUDIT_TEMPLATE.md (2026-10-08) + AUDIT_TEMPLATE_TS.md (2026-10-08) +
   AUDIT_TEMPLATE_SUI_CLIENT.md (2026-10-08) + AUDIT_TEMPLATE_AUTH.md (2026-10-08)
@@ -19,7 +19,7 @@
 
 **Deployment status:**
 
-- npm `@meddleware/nft-gate-client` **0.0.17** (`dist-tags.latest`), released 2026-10-10 (published
+- npm `@meddleware/access-gate-gateway-client` **0.0.17** (`dist-tags.latest`), released 2026-10-10 (published
   2026-10-10T15:14Z), with an SLSA v1 provenance attestation on the registry (`dist.attestations` present,
   checked 2026-10-18). Git tag `v0.0.17` is at `9f430ff` (code commit `f7abef3`; the later commit only
   records the hash in this audit). 0.0.16 (published 2026-10-08T06:28Z, tag `v0.0.16` at `e114369`) was the
@@ -31,13 +31,13 @@
   decoder (the Worker since its 2026-10-10 deployment).
 - 0.0.18 (2026-10-22, released: tag `v0.0.18` = `10404c4`, npm `latest` 0.0.18, the `Publish (npm)` run succeeded): `isTransactionDigest` decodes the base58 to exactly 32 bytes (F18), `buildAccessProof`
   checks the address and the challenge expiry before the wallet prompt (F14), `fetchChallenge` sends `cache: 'no-store'` and `credentials: 'omit'` and a real 302
-  is proven refused (F11), and `vectors.json` gains `txDigest` and `responses` (F15, F18). Consumers move to `^0.0.18` after the release; `nft-gate` took it in 0.0.28 and walrus-client in 0.0.30
+  is proven refused (F11), and `vectors.json` gains `txDigest` and `responses` (F15, F18). Consumers move to `^0.0.18` after the release; `nft-gate` took it in 0.0.28 and walrus-storage-client in 0.0.30
   (below, 2026-10-22 close-out).
 - Consumers (verified 2026-10-18 in `repos/*/package.json` and the Worker's lockfile, all `^0.0.17`):
-  `nft-gate/gateway-workers` (imports the decoder and the message derivation; Worker redeployed from `main`
-  on 2026-10-10 against the 2026-10-09 `access_gate` publication and relay gate), `walrus-client`
+  `access-gate-gateway/gateway-workers` (imports the decoder and the message derivation; Worker redeployed from `main`
+  on 2026-10-10 against the 2026-10-09 `access_gate` publication and relay gate), `walrus-storage-client`
   (`fetchChallenge` + `buildAccessProof`), `docs` and `dev`.
-  `nft-gate/gateway-rust` mirrors the format and consumes a vendored copy of `vectors.json`; it is kept at
+  `access-gate-gateway/gateway-rust` mirrors the format and consumes a vendored copy of `vectors.json`; it is kept at
   parity and **not deployed** (decision).
 - Live check 2026-10-10 (Worker redeployed with 0.0.17, `Deploy Workers` run 38077732841, success): a canonical
   proof token decodes; an unpadded token and a whitespace-split token are refused as `malformed access proof`
@@ -92,8 +92,8 @@
 
 ## Location
 
-This audit was relocated on 2026-10-03 from the shared corpus, `docs/audit/nft-gate-client-audit.md`, to
-`nft-gate-client/docs/audit/nft-gate-client-audit.md`. All `F#`/`OQ#` IDs from the 2026-09-18 pass are
+This audit was relocated on 2026-10-03 from the shared corpus, `docs/audit/access-gate-gateway-client-audit.md`, to
+`access-gate-gateway-client/docs/audit/access-gate-gateway-client-audit.md`. All `F#`/`OQ#` IDs from the 2026-09-18 pass are
 kept, F1–F8 and OQ1–OQ4. The 2026-10-03 pass added F9–F23 and OQ5–OQ7. The 2026-10-09 re-verification
 adds F24–F26. The 2026-10-10 fix wave resolves F24, F25, F26, F19 and F20 and the base64 residual
 of F10. Repo-local audit is canonical (decision).
@@ -143,7 +143,7 @@ are type guards (F25), `gatewayOrigin` errors no longer echo the URL (F26), `eng
 requires base58 that decodes to exactly 32 bytes (F18; the core and the TypeScript Worker apply the same rule). `buildAccessProof` refuses a malformed address or
 an expired challenge (30 s clock-skew allowance) before the wallet is asked to sign (F14). `fetchChallenge` sets `cache: 'no-store'` and `credentials: 'omit'`, and a
 test against a real local HTTP server proves a 302 is refused and not followed (F11). The vectors gain `txDigest` and `responses` (the status and body of sixteen
-gateway outcomes, pinned in the core, the TypeScript Worker and the Rust Worker harness) (F15); walrus-client already reads the contract through this package (F15), and
+gateway outcomes, pinned in the core, the TypeScript Worker and the Rust Worker harness) (F15); walrus-storage-client already reads the contract through this package (F15), and
 `walrus-relay`'s description no longer names it (F17).
 
 **Where residual risk remains** (as of 0.0.17, all Low or Info; closed in 0.0.18 except the rollout and the wallet display):
@@ -153,7 +153,7 @@ gateway outcomes, pinned in the core, the TypeScript Worker and the Rust Worker 
    decoder is the strict one (live-checked); before that it was the lenient 0.0.16 (F24 residual, not a
    bypass: the field grammar and every signature check are identical).
 2. **F11, F14, F15, F17, F18 (MITIGATED in 0.0.17, RESOLVED in 0.0.18)** — small remainders: no `cache: 'no-store'`, a bad address or
-   an expired challenge still reaching the wallet prompt, walrus-client's own conflict helper with
+   an expired challenge still reaching the wallet prompt, walrus-storage-client's own conflict helper with
    a message-regex fallback (already gone), `walrus-relay`'s package description (already fixed), and a digest check by
    shape only.
 3. **Wallet display** — audience binding only helps if the user or wallet notices a wrong origin line
@@ -193,7 +193,7 @@ unambiguous and audience-bound.
 | A3 | On-path attacker / hostile network | traffic if TLS is downgraded | substitute the nonce | https only, and a redirect is an error (F11) |
 | A4 | Phishing site / other dApp sharing the wallet | a sign prompt | have the user sign a message that names the **real** gateway | the message names origin, gate, network and consume digest, so it is useless at any other audience; the wallet display is the remaining control (F9, Risks) |
 | A5 | Attacker submitting tokens to a gateway | the token string | exercise `decodeAccessProof` on the Workers gateway | 4096-char cap, ASCII contract, field grammar, field-by-field copy; strict base64 / UTF-8 / JSON layers mirroring the Rust decoder (F24) |
-| A6 | Consuming app (walrus-client, gateways) | how outputs are used | mis-handle gateway responses | `contract.ts` defines the contract and `vectors.json` `responses` pins it for every gateway; walrus-client reads it through `parseGatewayError` (F15) |
+| A6 | Consuming app (walrus-storage-client, gateways) | how outputs are used | mis-handle gateway responses | `contract.ts` defines the contract and `vectors.json` `responses` pins it for every gateway; walrus-storage-client reads it through `parseGatewayError` (F15) |
 | A7 | npm registry / dependency authors | tarball; dev toolchain | ship altered code | lockfile; `npm audit`; OIDC provenance; zero runtime deps |
 | A8 | Maintainer / CI | publish | release a version | tag-gated, OIDC, idempotent (F21) |
 
@@ -250,10 +250,10 @@ Critical / High / Medium / Low / Info / Positive (unchanged across the corpus).
 
 **Cross-repo evidence (read-only):**
 
-- `nft-gate/conformance/vectors.json` (the vendored copy) and `nft-gate/scripts/sync-vectors.mjs`
-- `nft-gate/gateway-rust/src/proof.rs` (decoder parity) and `src/verify.rs` (`conformance_shared_vectors`)
-- `nft-gate/gateway-workers/src/wire.ts` and `src/verify.ts` (import this package)
-- `walrus-client/src/flow.ts` (`isRedeemedConflict`)
+- `access-gate-gateway/conformance/vectors.json` (the vendored copy) and `nft-gate/scripts/sync-vectors.mjs`
+- `access-gate-gateway/gateway-rust/src/proof.rs` (decoder parity) and `src/verify.rs` (`conformance_shared_vectors`)
+- `access-gate-gateway/gateway-workers/src/wire.ts` and `src/verify.ts` (import this package)
+- `walrus-storage-client/src/flow.ts` (`isRedeemedConflict`)
 
 **Out of scope:**
 
@@ -273,7 +273,7 @@ Critical / High / Medium / Low / Info / Positive (unchanged across the corpus).
 | `npm run build` | emits `dist/{index,types,challenge,proof,contract}.d.ts`; `decodeAccessProof` now carries its doc comment (F17) |
 | `npm audit` / `npm pack --dry-run` / `npm run check:vectors` (2026-10-22) | 0 vulnerabilities / 15 files / clean |
 | `npm pack --dry-run` | 15 files: `CHANGELOG.md`, `LICENSE`, `README.md`, `package.json`, `vectors.json`, `src/*.ts` (5), `dist/*.d.ts` (5); no tests, config or env files |
-| `npm view @meddleware/nft-gate-client` | 0.0.16 (`latest`); `dist.attestations.provenance.predicateType` = `https://slsa.dev/provenance/v1` (2026-10-18: `latest` is 0.0.17, published 2026-10-10T15:14Z, same predicate type) |
+| `npm view @meddleware/access-gate-gateway-client` | 0.0.16 (`latest`); `dist.attestations.provenance.predicateType` = `https://slsa.dev/provenance/v1` (2026-10-18: `latest` is 0.0.17, published 2026-10-10T15:14Z, same predicate type) |
 | Decoder probe (`decodeAccessProof` on crafted tokens) | 2026-10-09 (0.0.16): accepted canonical, unpadded, whitespace-split, extra unknown key, invalid UTF-8 inside an unknown key. Rejected: non-string `consumeDigest`. The `consume_digest` key is ignored. (F10, F24). 2026-10-10 (0.0.17): the unpadded, whitespace, invalid-UTF-8 rows are refused; see the differential run in the F24 evidence |
 
 The review left no tracked file changed. `dist/` and `node_modules/` are git-ignored, and the probe script
@@ -462,7 +462,7 @@ gateway; only the wallet display and the user noticing do (Risks, *Wallet displa
 **Severity:** Low   **Disposition:** RESOLVED (field grammar and digest typing in 0.0.16; the base64 and
 UTF-8 layer in 0.0.17, commit `f7abef3`, tracked as F24)
 **Where:** `src/proof.ts:192-214` (`requireProofShape`) and `:232-244` (`decodeAccessProof`) versus
-`nft-gate/gateway-rust/src/proof.rs:144-205`.
+`access-gate-gateway/gateway-rust/src/proof.rs:144-205`.
 
 **Issue:** The two gateways got different parse results for the cases below.
 
@@ -578,8 +578,8 @@ is pinned by these tests and by each gateway's own tests (both emit `{ nonce, ex
 
 - `src/contract.ts` (new in 0.0.16): `GATEWAY_STATUS` (`:8`), `GATEWAY_CONFLICT_CODES` (`:27`),
   `GatewayErrorBody`, `parseGatewayError` (`:40`)
-- `walrus-client/src/flow.ts:97-103` `isRedeemedConflict`
-- `nft-gate/gateway-workers/src/redemption.ts` and `gateway-rust/src/main.rs:252-260` (both emit
+- `walrus-storage-client/src/flow.ts:97-103` `isRedeemedConflict`
+- `access-gate-gateway/gateway-workers/src/redemption.ts` and `gateway-rust/src/main.rs:252-260` (both emit
   `code: 'redeemed'` / `'leased'`)
 
 **Issue:** The wire protocol had a response side that clients act on, with money at stake (re-consume or
@@ -595,7 +595,7 @@ contract.
   (3 tests, including that a state-store outage `503` stays distinct from a conflict `409`).
 - The Rust gateway now emits the `code` (`main.rs:252-260`), so both gateways match the contract. OQ7
   decided: part of the public API.
-- **Consumer adoption (verified 2026-10-22):** walrus-client imports `GATEWAY_STATUS` and `parseGatewayError` (`walrus-client/src/flow.ts:16`) and reads the conflict code through them
+- **Consumer adoption (verified 2026-10-22):** walrus-storage-client imports `GATEWAY_STATUS` and `parseGatewayError` (`walrus-storage-client/src/flow.ts:16`) and reads the conflict code through them
   (`gatewayConflictCodeOf`, `flow.ts:95-107`; `isRedeemedConflict` at `:114` is built on it); message text is never inspected, so the `409` + `redeemed` message-regex fallback is gone.
 - **`responses` vectors (0.0.18):** `vectors.json` `responses` pins `statuses` (= `GATEWAY_STATUS`, which gains `methodNotAllowed` 405 and `loopDetected` 508, both already emitted), `conflictCodes` (= `GATEWAY_CONFLICT_CODES`) and sixteen outcomes with their exact status and
   `{ error, code? }` body: missing and malformed proof, bad signature, replayed nonce, no pass, no consume, paused gate, chain error (502), store outage (503), rate limit (429), 405, loop (508), `redeemed` and `leased` (409 + code),
@@ -619,12 +619,12 @@ vector differed from it, and `SECURITY.md` overstated the control.
 
 - `vectors.json` is generated by `scripts/gen-vectors.mjs` (message built independently of `src/`, real
   ed25519 / secp256k1 / secp256r1 signatures, ZIP-215 and negative cases) and published as
-  `@meddleware/nft-gate-client/vectors.json` (`exports`, `files`).
+  `@meddleware/access-gate-gateway-client/vectors.json` (`exports`, `files`).
 - `tests/vectors.test.ts` (53 test cases) asserts every vector with the library **and** with the Sui SDK
   verifier as an independent implementation.
 - `npm run check:vectors` runs in Node CI and in the publish `verify` job, so a stale file cannot ship.
 - The gateways consume it: Workers through the package, Rust through the vendored
-  `nft-gate/conformance/vectors.json` (synced by `nft-gate/scripts/sync-vectors.mjs`, asserted by
+  `access-gate-gateway/conformance/vectors.json` (synced by `nft-gate/scripts/sync-vectors.mjs`, asserted by
   `gateway-rust/src/verify.rs` `conformance_shared_vectors`).
 - `SECURITY.md` invariant 3 and `README.md` now describe this mechanism. The local golden vector and its
   stale paths are gone.
@@ -646,7 +646,7 @@ vector differed from it, and `SECURITY.md` overstated the control.
 - `AGENTS.md` said "Node.js ≥ 22" while the workspace decision is Node 24 LTS only, and `package.json` had
   no `engines`. **Fixed** in 0.0.17 (`AGENTS.md` ≥ 24; `engines`, see F20).
 - Outside this repo: `walrus-relay/package.json` described itself as "Built on …
-  @meddleware/nft-gate-client" but depended only on `@meddleware/walrus-client`. **Fixed**, verified 2026-10-22: the description (`walrus-relay/package.json:4`) now reads "Built on @meddleware/walrus-client +
+  @meddleware/access-gate-gateway-client" but depended only on `@meddleware/walrus-storage-client`. **Fixed**, verified 2026-10-22: the description (`walrus-relay/package.json:4`) now reads "Built on @meddleware/walrus-storage-client +
   @meddleware/access-gate-client" and no longer names this package.
 
 **Issue / Impact:** These can mislead integrators and the planned TypeDoc reference (`dev.` site). This is
@@ -657,7 +657,7 @@ one-line edit in `walrus-relay` (read-only check from here). Nothing changes beh
 
 ### F18 — `isTransactionDigest` checks shape only, not the decoded length
 
-**Severity:** Info   **Disposition:** RESOLVED (digest shape enforced at decode and message time in 0.0.16; exact decoded length in 0.0.18, with the same rule in `nft-gate-core`; commit 53b81cd)
+**Severity:** Info   **Disposition:** RESOLVED (digest shape enforced at decode and message time in 0.0.16; exact decoded length in 0.0.18, with the same rule in `access-gate-gateway-core`; commit 53b81cd)
 **Where:** `src/proof.ts` (`TX_DIGEST` prefilter, `base58DecodedLength`, `isTransactionDigest`).
 
 **Issue:** Any 32–44-character base58 string passed, including strings that decode to fewer or more than
@@ -670,7 +670,7 @@ the RPC.
 
 - `isTransactionDigest` keeps the 32–44-character alphabet regex as a bounded prefilter and then decodes the base58 with a dependency-free big-number loop (each leading `1` is one zero byte), requiring exactly 32 bytes. Every path that
   accepted a digest uses it: `personalMessage`, `encodeAccessProof` and `decodeAccessProof`.
-- Rust: `nft-gate-core` `proof::is_tx_digest` has the same rule (gateway-rust F51); the TypeScript Worker imports this function, so all three agree.
+- Rust: `access-gate-gateway-core` `proof::is_tx_digest` has the same rule (gateway-rust F51); the TypeScript Worker imports this function, so all three agree.
 - Vectors: `txDigest` (6 valid: the golden digest, 32 zero bytes (32 characters), a leading zero byte, the smallest value without one, all `0xff`, 43 `z`; 15 invalid: empty, 31 and 33 zero bytes, 45 characters, 43 characters that decode to
   31 bytes, 44 that decode to 33, 32 characters that decode to 24 bytes, a leading `1` that makes 33 bytes, each of `0 O I l`, `+`, a non-ASCII letter, 64 hex-looking characters), five more `proofDecodeRejects` (32 → 27 + 5) and two
   `personalMessageRejects`. `tests/vectors.test.ts` checks every `txDigest` case with the library **and** with `isValidTransactionDigest` from `@mysten/sui` as the independent rule, and that the set covers lengths 32/43/44 valid and
@@ -773,7 +773,7 @@ unless they set `engine-strict`).
 **Severity:** Low   **Disposition:** RESOLVED (0.0.17, commit `f7abef3`; OQ8 decided: strict, in this decoder
 and pinned by vectors both gateways consume)
 **Where:** `src/proof.ts:104-175` (`fromBase64`, `requireJsonLikeRust`) and `:232-244` (`decodeAccessProof`),
-versus `nft-gate/gateway-rust/src/proof.rs:157-160` (`BASE64_STANDARD.decode(token.trim())`, then
+versus `access-gate-gateway/gateway-rust/src/proof.rs:157-160` (`BASE64_STANDARD.decode(token.trim())`, then
 `serde_json::from_slice`).
 
 **Issue:** Probe on 2026-10-09: `decodeAccessProof` (0.0.16) accepted an unpadded token, a token with
@@ -886,11 +886,11 @@ a password, none of the error texts contains the password or the host); the exis
 | I13 | Challenge response fully validated (nonce alphabet + positive expiry) | `challenge.ts:78-84` | `:22`, `:80` | HOLDS |
 | I14 | The wallet is prompted only for a proof the gateways can accept | `proof.ts` `buildAccessProof` | "refuses malformed inputs before asking the wallet to sign"; "never prompts the wallet for a proof that cannot work" (signer spy) | HOLDS (F14, 0.0.18; only the returned signature is checked after signing) |
 | I15 | The signed message identifies its audience (origin, gate, network, consume) | `proof.ts:63-72, 97-104` | vectors `audienceMismatch` (8, each bound field) with an independent verifier | HOLDS (wallet display is a Risk) — F9 |
-| I16 | The response contract (status, body, conflict codes) is defined once and every gateway answers it | `contract.ts`; vectors `responses` | `tests/contract.test.ts`; `tests/vectors.test.ts` (`responses`); core, TypeScript Worker and Rust Worker suites | HOLDS; walrus-client reads it through `parseGatewayError` — F15 |
+| I16 | The response contract (status, body, conflict codes) is defined once and every gateway answers it | `contract.ts`; vectors `responses` | `tests/contract.test.ts`; `tests/vectors.test.ts` (`responses`); core, TypeScript Worker and Rust Worker suites | HOLDS; walrus-storage-client reads it through `parseGatewayError` — F15 |
 | I17 | `SECURITY.md` matches the code | `SECURITY.md` invariants 1–5 | review 2026-10-09 | HOLDS |
 | I18 | Signed-challenge protocol: versioned, domain-separated, ASCII, verifier rebuilds from its own configuration, shared vectors with negatives for every bound field (AUTH) | `proof.ts:4, 63-72`; gateway `verify` | `audienceMismatch`, `negativeSignatures` (8), `zip215`; both gateways consume the same file | HOLDS — F9, F16 |
 | I19 | No token, signature or proof reaches logs or errors | `src/` has no `console`; error texts carry no field values (the gateway URL is no longer echoed since 0.0.17) | review; `tests/proof.test.ts` "never echoes the input in an error" | HOLDS (F26) |
-| I20 | A consume digest is base58 that decodes to exactly 32 bytes in every implementation | `proof.ts` `isTransactionDigest`; `nft-gate-core` `is_tx_digest` | vectors `txDigest` and the digest `proofDecodeRejects` (client, core, TypeScript Worker); `isValidTransactionDigest` as the independent rule | HOLDS (F18, 0.0.18) |
+| I20 | A consume digest is base58 that decodes to exactly 32 bytes in every implementation | `proof.ts` `isTransactionDigest`; `access-gate-gateway-core` `is_tx_digest` | vectors `txDigest` and the digest `proofDecodeRejects` (client, core, TypeScript Worker); `isValidTransactionDigest` as the independent rule | HOLDS (F18, 0.0.18) |
 
 ---
 
@@ -924,7 +924,7 @@ so consumers inherit nothing from this package.
 
 No deviation from the ADR-0001 baseline. `@mysten/sui` is a dev dependency only and is never in the
 published bundle, so TS-M9 (peer declaration) is N/A. Downstream, the first-party consumers
-(`gateway-workers`, `walrus-client`, `docs`, `dev`) declare `^0.0.17` (2026-10-18; `^0.0.16` on 2026-10-09),
+(`gateway-workers`, `walrus-storage-client`, `docs`, `dev`) declare `^0.0.17` (2026-10-18; `^0.0.16` on 2026-10-09),
 which resolves exactly to the latest published version.
 
 **SUI_CLIENT lens rows:**
@@ -933,14 +933,14 @@ which resolves exactly to the latest published version.
 - **Transport:** none to the chain.
 - **RPC endpoints:** none.
 - **Conformance vectors:** `vectors.json` in this package (generated, published, asserted in
-  `tests/vectors.test.ts`); vendored in `nft-gate/conformance/vectors.json` and asserted by both gateway
+  `tests/vectors.test.ts`); vendored in `access-gate-gateway/conformance/vectors.json` and asserted by both gateway
   suites.
 
 ### B.2 Publish authority, capabilities & secret custody
 
 | Authority / capability / secret | Where minted / held | Custody | Gates | Immutability / rotation plan |
 | --- | --- | --- | --- | --- |
-| npm publish `@meddleware/nft-gate-client` | `npm-publish.yml` (tag `v*`) | GitHub OIDC → npm trusted publisher; `--provenance` | package releases | n/a (no token) |
+| npm publish `@meddleware/access-gate-gateway-client` | `npm-publish.yml` (tag `v*`) | GitHub OIDC → npm trusted publisher; `--provenance` | package releases | n/a (no token) |
 | Private keys | — | **never held** (caller-supplied signer); the vector generator uses throw-away test keys | signing | n/a |
 
 #### CI & release integrity
@@ -963,7 +963,7 @@ which resolves exactly to the latest published version.
 | `exports` / `types` | correct per runtime; types resolvable | Yes — `types` → `dist/index.d.ts` (built by `prepublishOnly`), `default` → `src/index.ts`; `./vectors.json` export; ESM `.js` specifiers resolve to `.ts` under bundlers (Vite, wrangler/esbuild) |
 | `files` | explicit whitelist; no tests, fixtures, env files or keys | Yes — `src`, `dist`, `vectors.json`, `CHANGELOG.md` (+ npm defaults); pack verified, 15 files |
 | `sideEffects` | accurate | Yes — `false`; no module has import-time effects |
-| Ships-source packages type-check under consumers' settings | | Partly — consumers get the `.d.ts`; the `.ts` source is strict + `noUncheckedIndexedAccess`; the gateway-workers and walrus-client builds compile it (their CI) |
+| Ships-source packages type-check under consumers' settings | | Partly — consumers get the `.d.ts`; the `.ts` source is strict + `noUncheckedIndexedAccess`; the gateway-workers and walrus-storage-client builds compile it (their CI) |
 
 ### B.TS-2 Install-time code
 
@@ -1011,7 +1011,7 @@ N/A — no Move calls since 0.0.13.
 
 ### B.SC-3 Cross-implementation parity
 
-The parity table's home is `nft-gate/gateway-workers/docs/audit/gateway-workers-audit.md` §B.SC-3. This
+The parity table's home is `access-gate-gateway/gateway-workers/docs/audit/gateway-workers-audit.md` §B.SC-3. This
 package is the **TypeScript reference implementation** of the rows "Personal message bytes" and "Proof
 decode", because the Workers gateway imports it, and it publishes the vectors both gateways test against.
 
@@ -1022,7 +1022,7 @@ decode", because the Workers gateway imports it, and it publishes the vectors bo
 | `consumeDigest` type / `consume_digest` key | non-string rejected; snake key ignored | same | ✓ | F10 |
 | base64 strictness (padding, whitespace, trailing bits, alphabet) | strict since 0.0.17 (canonical padded, ends trimmed) | strict (`STANDARD` + `trim()`) | `proofDecodeRejects` ✓ | F24 |
 | UTF-8 and JSON strictness (invalid UTF-8, BOM, depth 128, lone surrogate escape, overflowing number) | strict since 0.0.17 | strict (`serde_json`) | `proofDecodeRejects` ✓ | F24 |
-| Response contract (status and body per outcome, 409 `code`) | `contract.ts` | `nft-gate-core` `gateway.rs` (`JsonReply`) | `responses` (16 outcomes) ✓ in core, TypeScript Worker and Rust Worker harness | F15 |
+| Response contract (status and body per outcome, 409 `code`) | `contract.ts` | `access-gate-gateway-core` `gateway.rs` (`JsonReply`) | `responses` (16 outcomes) ✓ in core, TypeScript Worker and Rust Worker harness | F15 |
 | Consume digest (base58, exactly 32 bytes) | `isTransactionDigest` | `is_tx_digest` | `txDigest` (6 valid, 15 invalid) + digest `proofDecodeRejects` ✓ | F18 |
 
 ---
@@ -1094,7 +1094,7 @@ field, and every implementation consumes the same published file — **holds**.
 
 - [x] signed message bound to an audience (coordinated with both gateways) — F9; released 0.0.16 and
   deployed in the Worker, live-checked 2026-10-09
-- [x] response contract defined and shared — F15 (defined here, pinned by the `responses` vectors in every gateway's suite; walrus-client reads it through `parseGatewayError`, `flow.ts:16`)
+- [x] response contract defined and shared — F15 (defined here, pinned by the `responses` vectors in every gateway's suite; walrus-storage-client reads it through `parseGatewayError`, `flow.ts:16`)
 - [x] every fetch has a timeout — `challenge.ts:63-64`
 - [x] no raw `btoa`/`atob` on untrusted text — UTF-8 round trip on encode; ASCII contract on both sides
   (F2). Decoding is strict: `atob` is followed by a canonical re-encode check and a fatal UTF-8 decode
@@ -1115,10 +1115,10 @@ field, and every implementation consumes the same published file — **holds**.
   - There are no runtime dependencies, which is the strongest posture in the corpus for a package on
     a gateway's verification path.
 - **Wire-format coupling & conformance vectors:**
-  - The format is **defined here** and documented in `README.md`, root `nft-gate/CLAUDE.md` and this
+  - The format is **defined here** and documented in `README.md`, root `access-gate-gateway/CLAUDE.md` and this
     audit.
   - It is implemented here (client, and the Workers gateway via import) and in
-    `nft-gate/gateway-rust/src/proof.rs`.
+    `access-gate-gateway/gateway-rust/src/proof.rs`.
   - Drift is detected by `vectors.json`, generated and published here, asserted here with an independent
     verifier, and consumed by both gateways. Since 0.0.17 the vectors also pin the base64 / UTF-8 / JSON
     layers (F24); since 0.0.18 they pin the digest rule (F18) and the response side, the status and body of sixteen outcomes (F15).
@@ -1198,7 +1198,7 @@ AUTH lens:
   restating them.
 - **S4** (done 0.0.17) the three narrowing casts are type guards (TS-M1, F25).
 - **S5** MAY expose an `accessProofHeaders(token)` and `isRedeemedConflict(err)` helper so no consumer hand-writes `Bearer`. Not needed:
-  walrus-client reads the conflict code through `parseGatewayError` and the SDK attaches the header (F15).
+  walrus-storage-client reads the conflict code through `parseGatewayError` and the SDK attaches the header (F15).
 - **S6** SHOULD add `npm pack --dry-run` with an asserted file list to Node CI (F19). (Done in 0.0.17 /
   `4cdf244`: `--if-present` dropped, lint in the publish `verify` job, build in Node CI. Still open: the
   pack check.)
@@ -1221,7 +1221,7 @@ AUTH lens:
   dependencies** — `@mysten/sui` removed — see F5. It is a dev dependency only since 0.0.16.)
 - **OQ5** Message v2 binding fields. (Decided 2026-10-08, release 0.0.16: **gateway origin + gate id +
   network + the consume digest in single-use mode**, in a multi-line ASCII form a wallet can display; one
-  decision for this package, `nft-gate` and walrus-client — see F9.)
+  decision for this package, `nft-gate` and walrus-storage-client — see F9.)
 - **OQ6** Where should the conformance vectors live? (Decided 2026-10-08, release 0.0.16: **(b)** generated
   and published from this package as `exports["./vectors.json"]`; the Workers gateway consumes the
   package, the Rust gateway a vendored copy checked in CI — see F16.)
@@ -1248,7 +1248,7 @@ AUTH lens:
   decoder no longer leans on `atob`'s forgiving mode or the default `TextDecoder` (F24). The runtime
   floor is F20 (`engines.node` `>=24`).
 - **Coordinated releases.** Every wire change needs this package, both gateways, the vectors and
-  walrus-client released together. Pre-v0.2 there is no compatibility window, so a partial rollout
+  walrus-storage-client released together. Pre-v0.2 there is no compatibility window, so a partial rollout
   breaks uploads until all parts ship. (0.0.16 was rolled out this way on 2026-10-08/09, 0.0.17 on 2026-10-10.)
 - **Dev-toolchain supply chain.** 176 dev packages, including the eslint and vitest ecosystems and the Sui
   SDK. They are not shipped, but they run in CI with publish credentials one job away. The control is the
@@ -1262,7 +1262,7 @@ AUTH lens:
   marked RESOLVED in that file. F4 was ADJUDICATED; F6 and F8 were Positive.
 - 2026-10-03 — Re-verified at `8b10335` (tag `v0.0.15`, npm 0.0.15 with provenance) under the then-current
   base template and the TS and SUI_CLIENT lenses.
-  - Relocated to `nft-gate-client/docs/audit/`, with all IDs kept.
+  - Relocated to `access-gate-gateway-client/docs/audit/`, with all IDs kept.
   - F1, F2, F3, F7 and F8 re-verified as still holding.
   - F4, F5 and F6 are superseded by the 0.0.13 reduction to wire-protocol-only; their code moved to
     `@meddleware/access-gate-client`.
@@ -1297,7 +1297,7 @@ AUTH lens:
     echo), F19 (build in Node CI, lint in the publish `verify` job; `--if-present` was already gone), F20
     (`engines.node` `>=24`); F10 moves from MITIGATED to RESOLVED because its base64 residual is F24.
     F17 stays MITIGATED: the README and `AGENTS.md` nits are fixed, the `walrus-relay` description is in
-    another repo. F11, F14, F15, F18 unchanged (F15's remainder is walrus-client adoption).
+    another repo. F11, F14, F15, F18 unchanged (F15's remainder is walrus-storage-client adoption).
   - New: eleven `proofDecodeRejects` vectors (16 → 27) in `vectors.json`. The Rust gateway needs no new
     test (it consumes the array; its own `conformance_shared_vectors` passes unchanged on a scratch copy).
   - Differential run: `proof.rs` compiled unchanged (`base64 0.22.1`, `serde_json 1.0.151`) against the
@@ -1308,8 +1308,8 @@ AUTH lens:
     `npm run build` clean; `npm audit` 0; `npm pack --dry-run` 15 files.
   - Section D: only external review (maintainer, `OPERATOR_TASKS.md`) is unticked.
   - Pre-save consistency checklist run.
-- 2026-10-18 — released (0.0.17), consumers bumped (nft-gate/gateway-workers, walrus-client, docs, dev: all
-  `^0.0.17`). `npm view` shows `@meddleware/nft-gate-client` 0.0.17 as `latest`, published 2026-10-10T15:14Z, with
+- 2026-10-18 — released (0.0.17), consumers bumped (access-gate-gateway/gateway-workers, walrus-storage-client, docs, dev: all
+  `^0.0.17`). `npm view` shows `@meddleware/access-gate-gateway-client` 0.0.17 as `latest`, published 2026-10-10T15:14Z, with
   SLSA v1 provenance (`dist.attestations`); tag `v0.0.17` at `9f430ff`. The Worker was redeployed from `main`
   on 2026-10-10 (`Deploy Workers` run 38077732841, success) and checked live: a canonical proof token decodes,
   an unpadded token and a whitespace-split token are refused as `malformed access proof`. The rollout item of
@@ -1317,9 +1317,9 @@ AUTH lens:
 - 2026-10-19 — dependency-bot status checked (read-only): `.github/dependabot.yml` carries the `ignore` rules and the repository has no open Dependabot pull requests (`gh pr list`, 2026-10-19). Versions, findings and gates were not re-examined in this pass.
   - Dependabot policy encoded in .github/dependabot.yml (majors declined); open PRs merged 2026-10-19
 - 2026-10-22 — Residuals closed in 0.0.18 (committed locally; not tagged or published). Read: `src/`, `scripts/gen-vectors.mjs`, `nft-gate/core` and `gateway-workers` (the digest and the response drivers),
-  `walrus-client/src/flow.ts` and `walrus-relay/package.json` (read-only).
+  `walrus-storage-client/src/flow.ts` and `walrus-relay/package.json` (read-only).
   - Resolved: F11 (`cache: 'no-store'`, `credentials: 'omit'`, a real 302 and 301 proven refused), F14 (address and expiry checked before the wallet prompt; 30 s skew), F18 (base58 that decodes to exactly 32 bytes; the same rule
-    in `nft-gate-core`), F15 (walrus-client adoption verified at `flow.ts:16` and `:95-107`; `responses` vectors added and wired into the core, the TypeScript Worker and the Rust Worker harness), F17 (the `walrus-relay` description no longer names this package).
+    in `access-gate-gateway-core`), F15 (walrus-storage-client adoption verified at `flow.ts:16` and `:95-107`; `responses` vectors added and wired into the core, the TypeScript Worker and the Rust Worker harness), F17 (the `walrus-relay` description no longer names this package).
   - Vectors: `txDigest` (6 valid, 15 invalid), five `proofDecodeRejects` (27 → 32), two `personalMessageRejects` (13 → 15), `responses` (16 outcomes). `GATEWAY_STATUS` gains `methodNotAllowed` (405) and `loopDetected` (508).
   - Measured (Node 26.12.0): vitest 159 passed (4 files); `tsc --noEmit`, `eslint .`, `check:vectors` and `npm run build` clean; `npm audit` 0; `npm pack --dry-run` 15 files. Mutation check: `redirect: 'follow'` fails the real-server tests.
   - Section D: only external review (maintainer, `OPERATOR_TASKS.md`) is unticked. Counts: 20 RESOLVED, 1 ADJUDICATED, 5 Positive.
@@ -1327,9 +1327,9 @@ AUTH lens:
   - Pre-save consistency checklist run.
 
 - 2026-10-22 (audit close-out) — release status and consumers; no code change.
-  - 0.0.18 is released (tag `v0.0.18` = `10404c4`, npm `latest` 0.0.18, `Publish (npm)` succeeded). Consumers on `^0.0.18`: `nft-gate` 0.0.28 (the TypeScript Worker, `gateway-workers`; released as `v0.0.28`) and walrus-client 0.0.30 (and through it walrus-relay 0.1.33, walrus-ui 0.1.61, seal-ui 0.0.40, token-deployer-ui 0.0.38).
-  - **The F14 rule exposed a consumer bug, fixed in the consumer:** walrus-client's gated flow passed a synthetic `expiresAt: 0` to `buildAccessProof`; 0.0.18 refuses an expired challenge before the wallet prompt, so the flow failed. walrus-client 0.0.30 passes the gateway's real challenge expiry (walrus-client audit F26, regression test). This is the intended behaviour of F14 (the check catches a caller that does not hold a real challenge); no change here.
-  - Verified read-only: F15 adoption (`walrus-client/src/flow.ts:16` imports `GATEWAY_STATUS` and `parseGatewayError`; line 102 reads the conflict through them) and F17 (`walrus-relay/package.json` description names `@meddleware/walrus-client` and `@meddleware/access-gate-client`, not this package); both dispositions stand RESOLVED. Counts unchanged (20 RESOLVED, 1 ADJUDICATED, 5 Positive).
+  - 0.0.18 is released (tag `v0.0.18` = `10404c4`, npm `latest` 0.0.18, `Publish (npm)` succeeded). Consumers on `^0.0.18`: `nft-gate` 0.0.28 (the TypeScript Worker, `gateway-workers`; released as `v0.0.28`) and walrus-storage-client 0.0.30 (and through it walrus-relay 0.1.33, walrus-storage-ui 0.1.61, sealed-storage-ui 0.0.40, token-issuance-ui 0.0.38).
+  - **The F14 rule exposed a consumer bug, fixed in the consumer:** walrus-storage-client's gated flow passed a synthetic `expiresAt: 0` to `buildAccessProof`; 0.0.18 refuses an expired challenge before the wallet prompt, so the flow failed. walrus-storage-client 0.0.30 passes the gateway's real challenge expiry (walrus-storage-client audit F26, regression test). This is the intended behaviour of F14 (the check catches a caller that does not hold a real challenge); no change here.
+  - Verified read-only: F15 adoption (`walrus-storage-client/src/flow.ts:16` imports `GATEWAY_STATUS` and `parseGatewayError`; line 102 reads the conflict through them) and F17 (`walrus-relay/package.json` description names `@meddleware/walrus-storage-client` and `@meddleware/access-gate-client`, not this package); both dispositions stand RESOLVED. Counts unchanged (20 RESOLVED, 1 ADJUDICATED, 5 Positive).
 
 ## Pre-save consistency checklist (this pass)
 
@@ -1345,3 +1345,4 @@ AUTH lens:
 - [x] Executive summary reflects current dispositions.
 - [x] Counts and versions re-measured 2026-10-09, 2026-10-10 and 2026-10-22 (tests 159, vectors 32 decode rejects).
 - [x] Re-verification log entry added.
+- 2026-10-24 — repository renamed from `nft-gate-client` to `access-gate-gateway-client` (workspace naming convention, `docs/architecture/ADR-0003-naming.md`): package, image, host and path names updated throughout. No finding, disposition or evidence changed.

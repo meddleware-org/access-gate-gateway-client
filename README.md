@@ -1,8 +1,8 @@
-# @meddleware/nft-gate-client
+# @meddleware/access-gate-gateway-client
 
 [![License: 0BSD](https://img.shields.io/badge/License-0BSD-blue.svg)](LICENSE)
 
-The client side of the [nft-gate](https://github.com/meddleware-org/nft-gate) wire protocol: fetch a
+The client side of the [access-gate-gateway](https://github.com/meddleware-org/access-gate-gateway) wire protocol: fetch a
 challenge, derive the exact personal message a wallet signs, and encode the access proof a gateway
 verifies. Browser-safe, Node-friendly, **no runtime dependencies**.
 
@@ -12,13 +12,13 @@ platform configuration: [`@meddleware/access-gate-client`](https://github.com/me
 ## Install
 
 ```bash
-npm install @meddleware/nft-gate-client
+npm install @meddleware/access-gate-gateway-client
 ```
 
 ## Usage
 
 ```ts
-import { fetchChallenge, buildAccessProof } from '@meddleware/nft-gate-client'
+import { fetchChallenge, buildAccessProof } from '@meddleware/access-gate-gateway-client'
 
 // Single-use gates: first execute an access_gate `consume` (access-gate-client) and keep its digest.
 const challenge = await fetchChallenge(gateway)
@@ -37,7 +37,7 @@ const token = await buildAccessProof({ address, challenge, sign, gateway, gateId
 | `gatewayOrigin(url)`, `isNonce(s)`, `isTransactionDigest(s)` | canonical origin; nonce check; transaction digest check (base58 that decodes to exactly 32 bytes) |
 | `GATEWAY_STATUS`, `GATEWAY_CONFLICT_CODES`, `parseGatewayError(body)` | the gateways' response contract (`409` carries `code: redeemed \| leased`); the status and error text per outcome are pinned in `vectors.json` `responses` |
 | types `Challenge`, `AccessProof`, `AccessMessageContext`, `SuiNetwork`, `PersonalMessageSigner` | wire types |
-| `@meddleware/nft-gate-client/vectors.json` | the shared conformance vectors |
+| `@meddleware/access-gate-gateway-client/vectors.json` | the shared conformance vectors |
 
 ## Wire protocol
 
@@ -61,7 +61,7 @@ const token = await buildAccessProof({ address, challenge, sign, gateway, gateId
   UTF-8 without a byte-order mark, and JSON nested at most 127 levels with no unpaired surrogate escape and
   no number that overflows (`1e999`). Only whitespace at either end of the token is ignored.
 
-Both gateways in [nft-gate](https://github.com/meddleware-org/nft-gate) verify exactly this format;
+Both gateways in [access-gate-gateway](https://github.com/meddleware-org/access-gate-gateway) verify exactly this format;
 `vectors.json` pins it, including the consume-digest rule (`txDigest`) and the status and body each gateway answers per outcome (`responses`) (`npm run gen:vectors` regenerates it, `npm run check:vectors` checks it is current).
 
 ## Development

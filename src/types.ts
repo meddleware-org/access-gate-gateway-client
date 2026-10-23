@@ -1,5 +1,5 @@
 /**
- * Wire-protocol types shared by clients and the nft-gate gateways. The `access_gate` object model
+ * Wire-protocol types shared by clients and the access-gate gateways. The `access_gate` object model
  * (gates, NFTs, platform config) lives in `@meddleware/access-gate-client`.
  */
 

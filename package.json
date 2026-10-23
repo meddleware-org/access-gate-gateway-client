@@ -1,14 +1,14 @@
 {
-  "name": "@meddleware/nft-gate-client",
-  "version": "0.0.18",
+  "name": "@meddleware/access-gate-gateway-client",
+  "version": "0.0.19",
   "homepage": "https://docs.meddleware.co.uk/blockchain/sui/access-gate/",
   "type": "module",
-  "description": "The nft-gate wire protocol, client side: challenge fetching, the signed personal message and access-proof encoding. No runtime dependencies.",
+  "description": "The access-gate gateway wire protocol, client side: challenge fetching, the signed personal message and access-proof encoding. No runtime dependencies.",
   "author": "MeddleWare <dev@meddleware.co.uk>",
   "license": "0BSD",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/meddleware-org/nft-gate-client.git"
+    "url": "git+https://github.com/meddleware-org/access-gate-gateway-client.git"
   },
   "keywords": [
     "sui",
