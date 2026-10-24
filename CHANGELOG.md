@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.21] - 2026-10-24
+
+### Changed
+
+- **Breaking:** the access message domain is `access-gate-gateway:access:v3` (was `nft-gate:access:v2`; ADR-0004). The audience lines are unchanged; a v2 proof is refused by the gateways. `vectors.json` regenerated.
+
 ## [0.0.20] - 2026-10-24
 
 ### Changed

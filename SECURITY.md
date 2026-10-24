@@ -22,7 +22,7 @@ treated as high severity:
    all signature/ownership authorization happens server-side in the gateway.
 2. **The client never holds private keys.** Signing is delegated to a caller-supplied signer.
 3. **The wire format is versioned, audience-bound and mirrored.** The signed message is
-   `nft-gate:access:v2` plus the gateway origin, gate id, network, nonce and (single-use) consume
+   `access-gate-gateway:access:v3` plus the gateway origin, gate id, network, nonce and (single-use) consume
    digest, and the proof token is `base64(JSON{address,nonce,signature,consumeDigest?})` with fixed
    field order, decoded strictly (canonical padded base64, strict UTF-8, the JSON limits serde_json applies)
    so both gateways reach identical decisions (the consume digest is base58 that decodes to exactly 32 bytes; the response status and error body per outcome are pinned too); both are pinned by the published `vectors.json`, which both gateway implementations

@@ -20,7 +20,7 @@ const fromB64 = (s) => new Uint8Array(Buffer.from(s, 'base64'))
 const utf8Token = (obj) => Buffer.from(JSON.stringify(obj), 'utf8').toString('base64')
 
 // ── the signed message ───────────────────────────────────────────────────────────────────────
-const VERSION = 'nft-gate:access:v2'
+const VERSION = 'access-gate-gateway:access:v3'
 const message = (c) =>
   new TextEncoder().encode(
     [VERSION, `origin:${c.origin}`, `gate:${c.gateId}`, `network:${c.network}`, `nonce:${c.nonce}`, ...(c.consumeDigest ? [`consume:${c.consumeDigest}`] : [])].join('\n'),
@@ -278,7 +278,7 @@ const responses = {
 
 const out = {
   description:
-    'Conformance vectors shared by the access-gate gateways and clients (protocol nft-gate:access:v2). `personalMessage.cases` are the exact signed bytes for a context; `personalMessageRejects` are contexts no implementation may sign or accept; `signatures` are real Sui personal-message signatures that must verify against the message rebuilt from `context`; `audienceMismatch` are valid signatures whose verifier-side context differs in one bound field and must be refused; `negativeSignatures` must be refused; `zip215` pins ed25519 to ZIP-215 (Sui\'s rule); `proofDecode*` pin the token grammar; `txDigest` pins the consume digest rule (base58 that decodes to exactly 32 bytes); `responses` pins the status and error body each gateway answers per outcome; `addressNormalization` pins canonical addresses. Regenerate with: node scripts/gen-vectors.mjs > vectors.json',
+    'Conformance vectors shared by the access-gate gateways and clients (protocol access-gate-gateway:access:v3). `personalMessage.cases` are the exact signed bytes for a context; `personalMessageRejects` are contexts no implementation may sign or accept; `signatures` are real Sui personal-message signatures that must verify against the message rebuilt from `context`; `audienceMismatch` are valid signatures whose verifier-side context differs in one bound field and must be refused; `negativeSignatures` must be refused; `zip215` pins ed25519 to ZIP-215 (Sui\'s rule); `proofDecode*` pin the token grammar; `txDigest` pins the consume digest rule (base58 that decodes to exactly 32 bytes); `responses` pins the status and error body each gateway answers per outcome; `addressNormalization` pins canonical addresses. Regenerate with: node scripts/gen-vectors.mjs > vectors.json',
   version: VERSION,
   personalMessage: { cases: [messageCase('ownership gateway', OWNERSHIP), messageCase('single-use gateway', SINGLE_USE)] },
   personalMessageRejects,

@@ -1346,3 +1346,4 @@ AUTH lens:
 - [x] Counts and versions re-measured 2026-10-09, 2026-10-10 and 2026-10-22 (tests 159, vectors 32 decode rejects).
 - [x] Re-verification log entry added.
 - 2026-10-24 — repository renamed from `nft-gate-client` to `access-gate-gateway-client` (workspace naming convention, `docs/architecture/ADR-0003-naming.md`): package, image, host and path names updated throughout. No finding, disposition or evidence changed.
+- 2026-10-24 — identifier alignment (`docs/architecture/ADR-0004-identifier-alignment.md`): the access message domain is `access-gate-gateway:access:v3` (was `nft-gate:access:v2`); `vectors.json` regenerated; 159 tests pass. Findings and dispositions unchanged; released as 0.0.21.

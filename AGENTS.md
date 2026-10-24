@@ -25,7 +25,7 @@ tests/          vitest unit tests, incl. vectors.json verified with an independe
 
 ## Rules
 
-- The wire format (`nft-gate:access:v2` message, base64(JSON) proof, field order) is shared with both
+- The wire format (`access-gate-gateway:access:v3` message, base64(JSON) proof, field order) is shared with both
   gateways in `meddleware-org/access-gate-gateway` and pinned by `vectors.json` — change them together.
 - `access_gate` builders/reads belong in `@meddleware/access-gate-client`, not here.
 - No runtime dependencies; no hardcoded addresses; no secrets.

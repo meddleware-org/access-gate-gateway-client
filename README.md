@@ -45,7 +45,7 @@ const token = await buildAccessProof({ address, challenge, sign, gateway, gateId
 - **Signed message** (ASCII, one `key:value` line each):
 
   ```text
-  nft-gate:access:v2
+  access-gate-gateway:access:v3
   origin:<canonical origin>
   gate:<0x + 64 lower-case hex>
   network:<localnet|devnet|testnet|mainnet>

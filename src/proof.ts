@@ -1,7 +1,7 @@
 import type { AccessMessageContext, AccessProof, Challenge, SuiNetwork } from './types.js'
 
 /** First line of every signed access message; a signature made for another purpose or version never matches. */
-export const ACCESS_MESSAGE_VERSION = 'nft-gate:access:v2'
+export const ACCESS_MESSAGE_VERSION = 'access-gate-gateway:access:v3'
 
 const NETWORKS: readonly SuiNetwork[] = ['localnet', 'devnet', 'testnet', 'mainnet']
 /** Characters a gateway may put in a nonce; no whitespace, so a nonce cannot add a line to the message. */
@@ -124,7 +124,7 @@ function gatewayOriginOrNull(s: string): string | null {
  * from its own origin, gate and network. ASCII, one `key:value` line each, so a wallet can show it:
  *
  * ```text
- * nft-gate:access:v2
+ * access-gate-gateway:access:v3
  * origin:<origin>
  * gate:<gate id>
  * network:<network>

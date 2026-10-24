@@ -22,7 +22,7 @@ async function verifies(address: string, signature: string, context: unknown): P
 
 describe('vectors.json', () => {
   it('names the protocol version the library implements', () => {
-    expect(vectors.version).toBe('nft-gate:access:v2')
+    expect(vectors.version).toBe('access-gate-gateway:access:v3')
   })
 
   it.each(vectors.personalMessage.cases)('personalMessage: $name', (c) => {
