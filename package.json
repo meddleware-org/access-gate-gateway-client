@@ -1,6 +1,6 @@
 {
   "name": "@meddleware/access-gate-gateway-client",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "homepage": "https://docs.meddleware.co.uk/blockchain/sui/access-gate/",
   "type": "module",
   "description": "The access-gate gateway wire protocol, client side: challenge fetching, the signed personal message and access-proof encoding. No runtime dependencies.",
