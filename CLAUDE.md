@@ -15,7 +15,7 @@
 
 ## Deferred documentation — NOT for the `docs.` website (planned here per Part 0.4)
 
-> Captured for the future **`dev.meddleware.co.uk`** subdomain; excluded from the user-facing
+> Captured for the future **`meddleware.dev`** subdomain; excluded from the user-facing
 > `docs.` site. The Access Gate user docs cover buying/using passes, not building against the SDK.
 
 ### `dev.` — developer integration (to write later)
