@@ -46,7 +46,7 @@
   `nft-gate:access:v2` proof built by this package (pass bought on gate `0x316f1bf9…`, consumed, upload
   through the Worker; the indexer shows minted=1 consumed=1).
 
-**Review date:** 2026-10-03; re-verified 2026-10-09; fix wave 2026-10-10; release status 2026-10-18; residuals closed 2026-10-22 (0.0.18)
+**Review date:** 2026-10-03; re-verified 2026-10-09; fix wave 2026-10-10; release status 2026-10-18; residuals closed 2026-10-22 (0.0.18); 0.0.22 re-verified 2026-10-30 (Point documentation links at the machine zone (ADR-0005))
 **Reviewer:** Internal review
 **Severity ceiling:** Medium — the package holds no funds or keys and makes no authorisation decision.
   However, `decodeAccessProof` and `personalMessage` sit **on the live Workers gateway's verification
