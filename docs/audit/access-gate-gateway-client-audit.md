@@ -1115,7 +1115,7 @@ field, and every implementation consumes the same published file — **holds**.
   (F24, 0.0.17).
 - [x] no `as` at trust boundaries without an inline justification — the three casts are type guards
   (`isRecord`, `isConflictCode`) since 0.0.17; no `as` in `src/` except `as const` (F25, Suggestion S4)
-- [ ] external review — maintainer / after launch: `OPERATOR_TASKS.md`, "Funding, grants and an external
+- [ ] external review (ADR-0009 gate G3: recommended before paid traffic at scale; FU-0018) — maintainer / after launch: `OPERATOR_TASKS.md`, "Funding, grants and an external
   audit — after launch"
 
 ---
