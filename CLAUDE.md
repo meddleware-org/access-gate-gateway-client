@@ -11,6 +11,22 @@
 - **0BSD licence.** Do not change the licence.
 - **No runtime dependencies.** Keep it that way: the gateways import this package directly.
 
+## Layout and commands
+
+Targets: Node.js >= 24, browsers, workerd. Public entry is `src/index.ts`; the `./vectors.json` subpath is also exported.
+
+```text
+src/
+  types.ts      Challenge, AccessProof
+  challenge.ts  fetchChallenge
+  proof.ts      personalMessage, buildAccessProof, encode/decodeAccessProof, gatewayOrigin, isNonce, isTransactionDigest
+  contract.ts   gateway response contract (statuses, conflict codes, parseGatewayError)
+scripts/gen-vectors.mjs   generates vectors.json
+tests/                    vitest unit tests, incl. vectors.json verified with an independent verifier (@mysten/sui)
+```
+
+`npm run type-check && npm run lint && npm test && npm run build`; `npm run gen:vectors` / `npm run check:vectors` for the vectors.
+
 ---
 
 ## Deferred documentation — NOT for the `docs.` website (planned here per Part 0.4)
