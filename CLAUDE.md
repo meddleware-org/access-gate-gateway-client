@@ -41,3 +41,7 @@ tests/                    vitest unit tests, incl. vectors.json verified with an
   token encoding — the canonical contract shared with **both** gateway implementations
   (`meddleware-org/access-gate-gateway`). This is the authoritative schema for the docs-site Access Gate
   reference and for anyone verifying proofs.
+
+## Interoperability
+
+- [docs/INTEROP.md](docs/INTEROP.md): the standards this project speaks, what is planned, where to extend it, and what proves each claim.

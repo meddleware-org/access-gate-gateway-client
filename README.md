@@ -75,3 +75,7 @@ npm run build   # emits .d.ts into dist/ (also run by prepublishOnly)
 ## License
 
 [0BSD](LICENSE)
+
+## Open standards
+
+What this project speaks, what is planned and where you can extend it: [docs/INTEROP.md](docs/INTEROP.md).
