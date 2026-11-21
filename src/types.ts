@@ -1,6 +1,9 @@
 /**
- * Wire-protocol types shared by clients and the access-gate gateways. The `access_gate` object model
+ * @file Wire-protocol types shared by clients and the access-gate gateways. The `access_gate` object model
  * (gates, NFTs, platform config) lives in `@meddleware/access-gate-client`.
+ *
+ * Role: the shapes of the three things that cross the wire: the challenge a gateway issues, the data a signed message binds, and the proof a client sends
+ * back. Types only (no runtime code). The Rust gateways (`access-gate-gateway-core`) define the same shapes; `vectors.json` is the shared test of both.
  */
 
 /** The Sui networks a gateway can serve; part of the signed message (audience binding). */
@@ -24,6 +27,7 @@ export interface AccessMessageContext {
   origin: string
   /** The guarded `Gate` object id: `0x` + 64 lower-case hex digits. */
   gateId: string
+  /** The network the gate lives on (part of the message, so a testnet proof cannot be replayed on mainnet). */
   network: SuiNetwork
   /** The challenge nonce being answered. */
   nonce: string

@@ -8,6 +8,9 @@
 **Project type:** TS SDK (npm package, ships TypeScript source + declaration-only build)
 **Template:** AUDIT_TEMPLATE.md (2026-11-01) + AUDIT_TEMPLATE_TS.md (2026-11-01) +
   AUDIT_TEMPLATE_SUI_CLIENT.md (2026-10-08) + AUDIT_TEMPLATE_AUTH.md (2026-10-08)
+  - **Added 2026-11-21 (Part B documentation pass):** AUDIT_TEMPLATE_DOCS.md (2026-11-20); AUDIT_TEMPLATE_RFC.md (2026-11-19), partial: the proof token's base64, JSON and UTF-8
+    layers, URLs and the challenge request; AUDIT_TEMPLATE_IOP.md (2026-11-19), partial: the open protocol and its vectors, public API and versioning; AUDIT_TEMPLATE_PRIV.md
+    (2026-11-20), partial: what the client sends and stores (nothing is stored).
   - AUTH is **triggered** since the 2026-10-09 re-verification. The 2026-10-03 pass treated it as a draft
     that homed the access proof in the Sui client lens. The lens is now complete, and its *Signed-challenge
     protocols* category and AUTH-M11 are the home of the audience-bound message this package defines. The
@@ -18,6 +21,10 @@
     generator `scripts/gen-vectors.mjs` signs only with throw-away test keys and never touches a chain.
 
 **Deployment status:**
+
+- *(Current, 2026-11-21: npm **`0.0.22` is `latest`** (tag `v0.0.22` = `ef73640`); four commits since the tag, nothing under `src/`. The tarball is 15 files, 89.0 kB unpacked
+  (`npm pack --dry-run`). Consumers: `access-gate-gateway/gateway-workers` (`^0.0.22`) and `access-gate-gateway/worker` (exactly `0.0.22`), `walrus-storage-client`, `docs-site`
+  and `dev-site` (`^0.0.22`). One Dependabot pull request is open (#11, the minor and patch group, 3 updates). The entries below are history, kept as written.)*
 
 - npm `@meddleware/access-gate-gateway-client` **0.0.17** (`dist-tags.latest`), released 2026-10-10 (published
   2026-10-10T15:14Z), with an SLSA v1 provenance attestation on the registry (`dist.attestations` present,
@@ -52,6 +59,8 @@
   However, `decodeAccessProof` and `personalMessage` sit **on the live Workers gateway's verification
   path**, and the message format it defines decides what a user's signature can be replayed for. A bypass
   still requires a gateway decision, so nothing here reaches High on its own.
+**Documentation pass 2026-11-21 (0.0.22 current):** F28 (documentation drift) is RESOLVED. The status below is the earlier one.
+
 **Status:** re-verified 2026-10-09 at `ed876ba` (release `0.0.16`, tag `e114369`); fix wave 2026-10-10 on
   top of it (release `0.0.17`, commit `f7abef3`, released 2026-10-10 and live in the Worker); the five remaining residuals closed
   2026-10-22 in `0.0.18` (released 2026-10-22, tag `v0.0.18`). Of the 26 findings (F1–F26), 5 are Positive
@@ -89,6 +98,19 @@
 **Authorization model:** none here. The gateways decide (signature + chain state), deny by default.
 
 ---
+
+**Front matter (DOCS, RFC, IOP and PRIV lenses, added 2026-11-21):**
+
+| Field | Value |
+| --- | --- |
+| Documentation status | ledger (workspace `docs/audit/DOCS_LEDGER.tsv`): 30 tracked files, 27 done (25 measured against the thresholds), 3 excluded (the lockfile, `LICENSE`, the generated `docs/INTEROP.md`), 0 pending, 0 fu (2026-11-21 pass) |
+| Required documents | README, CHANGELOG, SECURITY, CONTRIBUTING (added 2026-11-21), LICENSE (0BSD), CLAUDE.md, AGENTS.md: all present |
+| Doc lints | `check-docs.mjs` (workspace) is the gate. The shared `eslint-plugin-jsdoc` fragment is switched on here after the Phase 5 release of `@meddleware/eslint-config` |
+| Standards spoken | Sui personal-message signing (`@mysten/sui`, intent scope 3) — the message the wallet signs; base64 (RFC 4648), canonical padded standard alphabet — the proof token, decoded as strictly as the Rust gateway's `BASE64_STANDARD`; JSON (RFC 8259) — the token's payload, with the extra serde_json checks (depth 127, no unpaired surrogate, no overflowing number); UTF-8 (RFC 3629), strict — the decoder is fatal and keeps the BOM; URL syntax (RFC 3986) and HTTPS — `gatewayOrigin` and the challenge URL (https only, loopback excepted, no credentials); HTTP semantics (RFC 9110) — `fetchChallenge` refuses redirects and non-2xx; Fetch (WHATWG) — `cache: 'no-store'`, `credentials: 'omit'`, `redirect: 'error'`; base58 (Bitcoin alphabet) — the transaction digest rule (32 decoded bytes); SPDX `0BSD`, Sigstore / SLSA — as the other packages |
+| Deviations | none |
+| Drafts relied on | none. The challenge endpoint (`GET /v1/challenge`) and the `access-gate-gateway:access:v3` message are Meddleware's own protocol, specified by this package and its `vectors.json`, not a standard |
+| Data a person can take away | none: the package holds no data about anyone |
+| Personal data | none held. An address and a signature pass through to the gateway the caller chose; nothing is stored |
 
 ## Location
 
@@ -877,6 +899,24 @@ Scope: the changes since the last substantive entry of this audit: 0.0.22 (2026-
 **Severity:** Positive
 **Evidence:** the wire format has one definition and one golden file: `vectors.json` is regenerated by `scripts/gen-vectors.mjs` and the 159 tests, including the v3 message vectors the Rust gateway also reads, pass after the dependency refresh.
 
+### Part B documentation pass (2026-11-21)
+
+Scope: every tracked file read against the workspace's `docs/operations/DOCUMENTATION_STANDARD.md` and annotated (Part B Phase 1, the ninth repository, the second of the clients); the DOCS, RFC, IOP and
+PRIV lenses applied for the first time. Before and after editing: `npm ci`, type-check, lint, the 159 unit tests, `npm run check:vectors`, the declaration build and `npm audit --audit-level=high` (exit 0)
+passed. The diff is comment-only: the TypeScript compiles to identical output with comments removed, `scripts/gen-vectors.mjs` still produces a byte-identical `vectors.json`, the YAML parses to identical
+values (the shell comments inside `run:` blocks aside), and the JSON and TypeScript configurations parse alike.
+
+### F28 — Documentation drift found by the documentation pass
+**Severity:** Low   **Disposition:** RESOLVED (2026-11-21, unreleased)
+**Where:** this audit, `README.md`, `CLAUDE.md`, `scripts/gen-vectors.mjs`.
+**Issue:** (1) this audit gave 0.0.17 and 0.0.18 as the latest and the consumers at `^0.0.17`; npm has 0.0.22, with five dependents; (2) the README's Development section named three commands and not the lint,
+the vectors check, the audit or the Node 24 job; (3) CLAUDE.md's layout listed two of the four types in `types.ts`, had no Commands, Gotchas or Related section, and did not say that `vectors.json` is
+published and vendored by a Rust gateway; (4) there was no `CONTRIBUTING.md`; (5) `scripts/gen-vectors.mjs`, the source of the file both gateways test against, had comments on a few sections only and seven
+undocumented helpers; (6) the three signing keypairs in the generator were not described as test keys.
+**Impact:** none on the code. A contributor changing the generator could not see which vectors guard which rule, or that the file is a published contract.
+**Remediation / evidence:** the facts above are checked against npm and the consumers' manifests; the documents are completed; the generator is documented by section and helper, and `npm run check:vectors`
+passes (the output is unchanged).
+
 ### Delta notes
 - **A11Y lens:** SDK: not triggered.
 - **Supply chain:** published through the tag-gated trusted-publisher workflow with provenance (unchanged); Dependabot configuration present.
@@ -1041,6 +1081,51 @@ decode", because the Workers gateway imports it, and it publishes the vectors bo
 
 ---
 
+### B.DOCS-1 Ledger state
+
+30 tracked files: 27 done (25 measured against the thresholds), 3 excluded (lockfile, licence text, generated `docs/INTEROP.md`), 0 pending, 0 `fu:` rows (2026-11-21, commit recorded in the ledger).
+
+### B.DOCS-2 Commands run
+
+Every command in the README's Development section, CLAUDE.md's Commands section and CONTRIBUTING.md was run on 2026-11-21 and gave what the documents say: `npm ci`, `npm run type-check`, `npm run lint`,
+`npm test` (159 tests in 4 files), `npm run check:vectors`, `npm run build`, `npm audit --audit-level=high` (exit 0) and `npm pack --dry-run` (15 files).
+
+### B.DOCS-3 Generated documentation
+
+`vectors.json` is generated by `scripts/gen-vectors.mjs` (`npm run gen:vectors`) and checked by `npm run check:vectors`; the generator's comments describe each section. `docs/INTEROP.md` is generated by
+the workspace's `scripts/interop/gen-interop.py` from `config/interop.yaml`. `dist/*.d.ts` is built by `npm run build` and not tracked.
+
+### B.RFC-1 Standards inventory
+
+| Interface | Standard (and version) | Role | Where | Conformance evidence | Deviation |
+| --- | --- | --- | --- | --- | --- |
+| Signed message | Sui personal-message signing (intent scope 3), `@mysten/sui` | implements the message; the verifier is the SDK's | `personalMessage` | `tests/vectors.test.ts` verifies real ed25519, secp256k1 and secp256r1 signatures with the SDK | the message text is Meddleware's own protocol (`access-gate-gateway:access:v3`) |
+| Proof token | base64 (RFC 4648 §4, canonical padded) | implements, strictly | `decodeAccessProof`, `encodeAccessProof` | `proofDecodeRejects` (32 vectors) and `tests/proof.test.ts` | stricter than `atob`, on purpose: the same decisions as the Rust gateway |
+| Token payload | JSON (RFC 8259), UTF-8 (RFC 3629) | consumes | `decodeAccessProof` | the same vectors | the extra checks serde_json makes (depth 127, unpaired surrogates, overflowing numbers) are written out |
+| Gateway URL | URL syntax (RFC 3986), HTTPS | checks | `gatewayOrigin` | `tests/proof.test.ts`, `tests/challenge.test.ts` | http only to loopback |
+| Challenge request | HTTP semantics (RFC 9110), Fetch (WHATWG) | implements the client | `fetchChallenge` | `tests/challenge.test.ts`, including a real HTTP server for the redirect cases | — |
+| Transaction digest | base58 (Bitcoin alphabet), 32 bytes | implements | `isTransactionDigest` | `vectors.json` `txDigest`, checked against `isValidTransactionDigest` of the SDK | — |
+| Provenance | Sigstore / SLSA (npm provenance) | consumes | `npm-publish.yml` | `dist.attestations` on npm | — |
+
+### B.IOP-1 Export and exit drill
+
+Not applicable: the package holds no data about anyone. The protocol is open and specified by this package and `vectors.json` (published as a subpath export), so a third party can write a compatible
+client or gateway and test it against the same vectors.
+
+### B.IOP-2 Exit register entries
+
+npm (publication) and GitHub Actions (CI). The gateway is the caller's choice (any `https:` origin that speaks the protocol). There is no run-time dependency on a third party.
+
+### B.IOP-3 API stability
+
+The public API is everything exported from `src/index.ts` plus the `./vectors.json` subpath. Versioning is patch-only until mainnet (workspace policy), so a consumer's `^0.0.x` is an exact pin; a change of
+the wire format is a new message version (`:v3` today) and a new `vectors.json`, announced in `CHANGELOG.md`.
+
+### B.PRIV-1 / B.PRIV-2 / B.PRIV-3 Privacy inventories
+
+Personal data: none held. The client sends the gateway an address and a signature the person has just chosen to give. Nothing is stored in a browser or on disk; the challenge request carries no
+credentials and no cookies (`credentials: 'omit'`) and is never cached. There is no analytics and no logging. The only third party is the gateway the caller names. Recorded 2026-11-21.
+
 ## Section C — Test-coverage & hermetic/live split
 
 ### C.1 Coverage grade
@@ -1200,6 +1285,21 @@ AUTH lens:
 | --- | --- | --- |
 | AUTH-M1 – AUTH-M10 | N/A (no tokens issued or verified, no IdP, no browser session, no proxy, no user-supplied third-party token) | |
 | AUTH-M11 | holds for the client half: versioned `nft-gate:access:v2`, binds origin, gate, network, nonce and consume digest; the gateway rebuilds it from its own configuration | F9, I18 |
+
+**Lens baselines (DOCS, RFC, IOP, PRIV), first recorded 2026-11-21:**
+
+| ID | Holds? | Evidence |
+| --- | --- | --- |
+| DOCS-M1 | yes (all seven documents; 0BSD; CHANGELOG per release with an Unreleased section) | B.DOCS-1 |
+| DOCS-M2 | yes (every file's header and every declaration documented; ledger rows done) | `check-docs.mjs --report access-gate-gateway-client` |
+| DOCS-M3 | yes (the wire format, the gateway options and the vectors are in the README and CLAUDE.md) | README, CLAUDE.md |
+| DOCS-M4 | yes (commands run, links resolve, ids exist) | B.DOCS-2 |
+| DOCS-M5 | yes (no TODO, FIXME, XXX or HACK) | `check-docs.mjs` |
+| DOCS-M6 | yes (CLAUDE.md verified against the code, F28; AGENTS.md points to it) | this pass |
+| DOCS-M7 | yes (no secrets: the generator's three keypairs are fixed test keys, said so in its header) | inspection |
+| RFC-M1 to RFC-M7 | yes where they apply (B.RFC-1); M5 is the hosts', not a package's | B.RFC-1 |
+| IOP-M3, IOP-M5 | yes (B.IOP-3; no data, no ads, no tracking); IOP-M1, M2, M4, M6, M7: not applicable (no data, no service) | B.IOP-1 to 3 |
+| PRIV-M1 to PRIV-M8 | yes: nothing stored, nothing requested from any host but the gateway the caller names | B.PRIV |
 
 ## Implementation suggestions (SHOULD / MAY)
 
@@ -1362,3 +1462,10 @@ AUTH lens:
 - [x] Re-verification log entry added.
 - 2026-10-24 — repository renamed from `nft-gate-client` to `access-gate-gateway-client` (workspace naming convention, `docs/architecture/ADR-0003-naming.md`): package, image, host and path names updated throughout. No finding, disposition or evidence changed.
 - 2026-10-24 — identifier alignment (`docs/architecture/ADR-0004-identifier-alignment.md`): the access message domain is `access-gate-gateway:access:v3` (was `nft-gate:access:v2`); `vectors.json` regenerated; 159 tests pass. Findings and dispositions unchanged; released as 0.0.21.
+- 2026-11-21 — Part B documentation pass and first application of the DOCS, RFC, IOP and PRIV lenses (above, "Part B documentation pass"). Baseline before editing: `npm ci`, type-check, lint, 159 tests,
+  `check:vectors`, the declaration build, `npm audit --audit-level=high`. Every tracked file annotated to the documentation standard (headers, doc comments on every declaration, a reason beside each
+  statement group, the vector generator documented by section); `CONTRIBUTING.md` added; README Development section; CLAUDE.md Commands, Gotchas and Related sections. Found and fixed **F28**
+  (documentation drift). Verified live: npm `0.0.22` latest; five consumers read from their manifests; Dependabot #11 open. Re-run after editing: the same commands, all passing; the diff proven
+  comment-only (compiled output, parsed YAML, `vectors.json` byte-identical, configurations). Counts: F1 to F28.
+- [x] 2026-11-21: Template line cites DOCS, RFC, IOP and PRIV with their registry dates; their front-matter fields, Section B subsections and MUST rows added; F28 recorded in the findings and the log;
+  the deployment status, packaging, test counts and consumers current.

@@ -7,6 +7,17 @@
 //
 // The message is assembled inline (not imported from src/) so tests can compare the library's
 // output with an independent construction. Signatures are REAL Sui personal-message signatures.
+//
+// Why a generator and not a hand-written JSON file: the vectors include real signatures, digests built from bytes and tokens with deliberately broken base64
+// and JSON layers. Writing those by hand is how a vector ends up proving nothing. `npm run check:vectors` fails when the committed file differs from what this
+// script produces, so the file cannot drift from its source.
+//
+// Usage:      node scripts/gen-vectors.mjs > vectors.json     (npm run gen:vectors / check:vectors)
+// Reads:      nothing (all inputs are constants below; the keys are fixed seeds, so the output is deterministic).
+// Writes:     the JSON document on stdout. Nothing on disk, no network.
+// Exit codes: 0 on success; non-zero if a vector's precondition fails (a helper calls `fail`).
+// Sections:   the signed message; transaction digests; proof tokens (decode rejects); signatures (valid, audience mismatches, negatives, ZIP-215); gateway responses.
+// Secrets:    the three keypairs are test keys derived from constant bytes. They guard nothing and must never be used anywhere else.
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 import { Secp256k1Keypair } from '@mysten/sui/keypairs/secp256k1'
 import { Secp256r1Keypair } from '@mysten/sui/keypairs/secp256r1'
@@ -15,24 +26,33 @@ import { blake2b } from '@noble/hashes/blake2.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { p256 } from '@noble/curves/nist.js'
 
+/** Standard base64 of some bytes. */
 const b64 = (bytes) => Buffer.from(bytes).toString('base64')
+/** The bytes of a standard base64 string. */
 const fromB64 = (s) => new Uint8Array(Buffer.from(s, 'base64'))
+/** A proof token from an object whose strings may be non-ASCII (the JSON is encoded as UTF-8 before base64, as the client does). */
 const utf8Token = (obj) => Buffer.from(JSON.stringify(obj), 'utf8').toString('base64')
 
 // ── the signed message ───────────────────────────────────────────────────────────────────────
+// The protocol version line: the first line of every signed message. A change here is a breaking change of the wire protocol.
 const VERSION = 'access-gate-gateway:access:v3'
+/** The exact bytes the wallet signs for a context: version, origin, gate, network, nonce, and (single-use only) the consume digest, one `key:value` per line. */
 const message = (c) =>
   new TextEncoder().encode(
     [VERSION, `origin:${c.origin}`, `gate:${c.gateId}`, `network:${c.network}`, `nonce:${c.nonce}`, ...(c.consumeDigest ? [`consume:${c.consumeDigest}`] : [])].join('\n'),
   )
+// A real-looking 44-character base58 transaction digest used as the "golden" one.
 const DIGEST = '5Wq9tE4gXz8hEvFhYt8KkTJb2Pp6qXqj8cRk3xN1mYdL'
+// The context of an ownership gateway (no consume line).
 const OWNERSHIP = {
   origin: 'https://gateway.example',
   gateId: '0x' + 'a1'.repeat(32),
   network: 'testnet',
   nonce: 'GOLDEN-NONCE-123',
 }
+// The same context for a single-use gateway: it adds the consume digest.
 const SINGLE_USE = { ...OWNERSHIP, consumeDigest: DIGEST }
+/** The golden nonce. */
 const NONCE = OWNERSHIP.nonce
 
 // ── transaction digests ──────────────────────────────────────────────────────────────────────
@@ -40,8 +60,11 @@ const NONCE = OWNERSHIP.nonce
 // (32-44 characters of the alphabet) is not enough: 43 characters can be 31 bytes and 44 can be 33, and a
 // leading `1` is a zero byte. Valid digests are built from bytes with the SDK's encoder, so the generator
 // does not share code with `src/`.
+/** `len` bytes of `fill`, with the first bytes replaced by `head`. */
 const bytesOf = (len, fill = 0xff, head = []) => Uint8Array.from([...head, ...new Uint8Array(len - head.length).fill(fill)])
+/** `d` with the character at `at` replaced by `ch`. */
 const flip = (d, at, ch) => d.slice(0, at) + ch + d.slice(at + 1)
+// Digests every implementation must accept: the edge cases of "base58 that decodes to exactly 32 bytes".
 const txDigestValid = [
   ['golden digest (44 characters)', DIGEST],
   ['32 zero bytes: 32 leading 1s, the shortest valid digest', toBase58(new Uint8Array(32))],
@@ -50,6 +73,7 @@ const txDigestValid = [
   ['all 0xff (44 characters)', toBase58(bytesOf(32, 0xff))],
   ['43 characters that decode to 32 bytes (all z)', 'z'.repeat(43)],
 ].map(([name, digest]) => ({ name, digest }))
+// Digests every implementation must refuse: wrong decoded length, characters outside the alphabet, and shapes that merely look like digests.
 const txDigestInvalid = [
   ['empty', ''],
   ['31 characters (31 zero bytes)', '1'.repeat(31)],
@@ -68,6 +92,7 @@ const txDigestInvalid = [
   ['hex-looking 64 characters', 'a'.repeat(64)],
 ].map(([name, digest]) => ({ name, digest }))
 
+/** A positive message vector: the context and the exact text and bytes it must produce. */
 const messageCase = (name, context) => ({
   name,
   context,
@@ -75,6 +100,7 @@ const messageCase = (name, context) => ({
   messageBytesBase64: b64(message(context)),
 })
 
+// Contexts `personalMessage` must refuse: each is canonical except for one field, so only that field can be the reason. They include the line-injection nonces.
 const personalMessageRejects = [
   ['non-canonical origin: http on a non-loopback host', { ...OWNERSHIP, origin: 'http://gateway.example' }],
   ['non-canonical origin: upper-case host', { ...OWNERSHIP, origin: 'https://Gateway.example' }],
@@ -94,15 +120,23 @@ const personalMessageRejects = [
 ].map(([name, context]) => ({ name, context }))
 
 // ── proof tokens ─────────────────────────────────────────────────────────────────────────────
+/** A proof token from an object (ASCII fields). */
 const token = (o) => Buffer.from(JSON.stringify(o)).toString('base64')
 // Raw-token helpers for the base64 / UTF-8 / JSON layer vectors below. A canonical `proof` JSON, extended
 // with one unknown key where a vector needs a length that leaves base64 padding.
+// The smallest valid proof JSON; the layer vectors below damage a copy of it one way at a time.
 const PROOF_JSON = JSON.stringify({ address: '0x1', nonce: 'n', signature: 'AAAA' })
+/** The proof JSON with one extra key whose value is the given JSON text (a place to hide something the decoder ignores). */
 const withUnknownKey = (valueJson) => `${PROOF_JSON.slice(0, -1)},"k":${valueJson}}`
+/** Base64 of raw bytes (no JSON step), for vectors that need exact byte control. */
 const rawToken = (bytes) => Buffer.from(bytes).toString('base64')
+/** The token without its `=` padding (a vector for "unpadded base64"); fails if the token had none to strip. */
 const stripPadding = (t) => (t.endsWith('=') ? t.replace(/=+$/, '') : fail('vector needs padded base64'))
+/** `t` with `ch` inserted at index `at`. */
 const insertAt = (t, at, ch) => t.slice(0, at) + ch + t.slice(at)
+/** The token in the URL-safe base64 alphabet; fails if it has no `+` or `/` to replace (the vector would prove nothing). */
 const urlSafe = (t) => (/[+/]/.test(t) ? t.replace(/\+/g, '-').replace(/\//g, '_') : fail('vector needs + or / in the base64'))
+/** A token whose last base64 symbol has a non-zero low bit that a lenient decoder ignores. */
 function withTrailingBits(t) {
   // Set the lowest bit of the last data symbol: decodes to the same bytes in a lenient decoder, but the
   // symbol is not the canonical encoding of them.
@@ -113,9 +147,11 @@ function withTrailingBits(t) {
   if (last & 1) fail('last symbol already has its low bit set')
   return body.slice(0, -1) + ALPHABET[last | 1] + t.slice(body.length)
 }
+/** Stop the generator with a reason (used when a vector's precondition is not met). */
 function fail(why) {
   throw new Error(why)
 }
+// Tokens every decoder must reject, from the size limit through the field grammar to the base64, UTF-8 and JSON layers.
 const proofDecodeRejects = [
   ['oversized', 'A'.repeat(4097)],
   ['non-ASCII nonce', utf8Token({ address: '0x1', nonce: 'nönce', signature: 'AAAA' })],
@@ -155,10 +191,12 @@ const proofDecodeRejects = [
 ].map(([name, tok]) => ({ name, token: tok }))
 
 // ── signatures ───────────────────────────────────────────────────────────────────────────────
+// Fixed test keys of the three signature schemes Sui wallets use, so the signatures are reproducible. They secure nothing.
 const edKp = Ed25519Keypair.fromSecretKey(new Uint8Array(32).fill(7))
 const k1Kp = Secp256k1Keypair.fromSecretKey(new Uint8Array(32).fill(9))
 const r1Kp = Secp256r1Keypair.fromSecretKey(new Uint8Array(32).fill(11))
 
+/** A positive signature vector: a real personal-message signature by `kp` over the message for `context`, with the proof token that carries it. */
 async function vec(scheme, kp, context) {
   const address = kp.toSuiAddress()
   const { signature } = await kp.signPersonalMessage(message(context))
@@ -166,13 +204,16 @@ async function vec(scheme, kp, context) {
   return { scheme, address, context, signature, proofToken: token(proof), expect: true }
 }
 
+// Reference signatures over each message, reused below for the audience mismatches and the tampered variants.
 const edSig = (await edKp.signPersonalMessage(message(OWNERSHIP))).signature
 const edSigSingle = (await edKp.signPersonalMessage(message(SINGLE_USE))).signature
 const k1Sig = (await k1Kp.signPersonalMessage(message(OWNERSHIP))).signature
 const r1Sig = (await r1Kp.signPersonalMessage(message(OWNERSHIP))).signature
 
 // A valid signature presented against a message rebuilt from a different audience must fail.
+/** A negative vector: a valid signature that must fail because the verifier rebuilds a different message. */
 const mismatch = (name, address, signature, context) => ({ case: name, address, signature, context, expect: false })
+// Each case changes what the gateway rebuilds (origin, gate, network, nonce, consume line or version), not the signature.
 const audienceMismatch = [
   mismatch('wrong origin', edKp.toSuiAddress(), edSig, { ...OWNERSHIP, origin: 'https://other.example' }),
   mismatch('wrong gate', edKp.toSuiAddress(), edSig, { ...OWNERSHIP, gateId: '0x' + 'b2'.repeat(32) }),
@@ -185,14 +226,19 @@ const audienceMismatch = [
 ]
 
 // ── negative + ZIP-215 vectors (over the ownership message) ──────────────────────────────────
+/** The Sui address of a public key: blake2b-256 of the scheme flag byte and the key. */
 const suiAddress = (flag, pk) => '0x' + Buffer.from(blake2b(Uint8Array.from([flag, ...pk]), { dkLen: 32 })).toString('hex')
+/** A BigInt as 32 big-endian bytes. */
 const bigToBytes32 = (n) => Uint8Array.from(Buffer.from(n.toString(16).padStart(64, '0'), 'hex'))
+/** 32 big-endian bytes as a BigInt. */
 const bytesToBig = (b) => BigInt('0x' + Buffer.from(b).toString('hex'))
+/** The same ECDSA signature with its `s` replaced by `order - s` (the malleable "high-S" twin, which verifiers must refuse). */
 function highS(sigB64, order) {
   const raw = fromB64(sigB64)
   raw.set(bigToBytes32(order - bytesToBig(raw.subarray(33, 65))), 33)
   return b64(raw)
 }
+/** An ed25519 signature whose `s` is increased by the group order L: it verifies in a lenient verifier but is not canonical. */
 function ed25519NonCanonicalS(sigB64) {
   const raw = fromB64(sigB64)
   const L = 2n ** 252n + 27742317777372353535851937790883648493n
@@ -200,7 +246,9 @@ function ed25519NonCanonicalS(sigB64) {
   raw.set(bigToBytes32(s).reverse(), 33)
   return b64(raw)
 }
+/** The signature with its scheme flag byte changed (multisig, zkLogin and passkey signatures must fail closed here). */
 const withFlag = (sigB64, flag) => { const raw = fromB64(sigB64); raw[0] = flag; return b64(raw) }
+/** A signature over the same message under the wrong intent scope (TransactionData, not PersonalMessage): it must never verify as a personal message. */
 async function wrongIntent(kp) {
   const m = message(OWNERSHIP)
   // Intent scope 0 (TransactionData) instead of 3 (PersonalMessage), over the same BCS-wrapped bytes.
@@ -208,9 +256,12 @@ async function wrongIntent(kp) {
   const sig = await kp.sign(digest)
   return b64(Uint8Array.from([0x00, ...sig, ...kp.getPublicKey().toRawBytes()]))
 }
+/** ULEB128, the length prefix BCS uses. */
 function uleb(n) { const out = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; out.push(b) } while (n); return out }
 
+/** A negative signature vector over the ownership message. */
 const negative = (name, address, signature) => ({ case: name, address, context: OWNERSHIP, signature, expect: false })
+// Tampered or unsupported signatures the gateways must refuse.
 const negativeSignatures = [
   negative('secp256k1 high-S', k1Kp.toSuiAddress(), highS(k1Sig, secp256k1.Point.CURVE().n)),
   negative('secp256r1 high-S', r1Kp.toSuiAddress(), highS(r1Sig, p256.Point.CURVE().n)),
@@ -222,8 +273,10 @@ const negativeSignatures = [
   negative('flag 0x06 passkey (fails closed)', edKp.toSuiAddress(), withFlag(edSig, 0x06)),
 ]
 
+// The ed25519 identity point (a small-order key), encoded as 32 bytes with the first byte 1.
 const identity = new Uint8Array(32)
 identity[0] = 1
+// A signature that is valid under ZIP-215 (what Sui validators accept) but not under strict RFC 8032: it pins the verifier's rule.
 const zip215 = {
   description:
     'ed25519 small-order public key (identity), R = identity, s = 0: valid under ZIP-215 (the rule Sui validators apply) for any message, invalid under strict RFC 8032.',
@@ -238,6 +291,7 @@ const zip215 = {
 // `src/contract.ts`. `outcome` is a closed set of names; each implementation maps every name to a
 // stimulus of its own (a decision, a store result, a request) and asserts the answer, and fails on a name
 // it does not know. Error texts are part of the contract: both gateways emit exactly these.
+/** The statuses a gateway uses; the same table as `GATEWAY_STATUS` in `src/contract.ts` (written out so the generator shares no code with `src/`). */
 const STATUS = {
   missingProof: 401,
   denied: 403,
@@ -250,7 +304,9 @@ const STATUS = {
   gatewayTimeout: 504,
   loopDetected: 508,
 }
+/** One expected gateway answer: the outcome name, the status, the error text and (for a conflict) the code. */
 const response = (outcome, status, error, code) => ({ outcome, status, error, ...(code ? { code } : {}) })
+// Every outcome a gateway can answer, with the exact status and error text both gateways emit.
 const responses = {
   description:
     'The gateways\' answer for each outcome: HTTP status and the JSON body { error, code? } (`code` only on a 409 conflict). `statuses` is GATEWAY_STATUS, `conflictCodes` is GATEWAY_CONFLICT_CODES, and each case names an `outcome` every implementation must be able to produce and then answer exactly so. Upstream transport faults (413, 504, an upstream 502) are not listed: they depend on the upstream, not on the protocol.',
@@ -276,6 +332,7 @@ const responses = {
   ],
 }
 
+// The whole document, in the order consumers read it.
 const out = {
   description:
     'Conformance vectors shared by the access-gate gateways and clients (protocol access-gate-gateway:access:v3). `personalMessage.cases` are the exact signed bytes for a context; `personalMessageRejects` are contexts no implementation may sign or accept; `signatures` are real Sui personal-message signatures that must verify against the message rebuilt from `context`; `audienceMismatch` are valid signatures whose verifier-side context differs in one bound field and must be refused; `negativeSignatures` must be refused; `zip215` pins ed25519 to ZIP-215 (Sui\'s rule); `proofDecode*` pin the token grammar; `txDigest` pins the consume digest rule (base58 that decodes to exactly 32 bytes); `responses` pins the status and error body each gateway answers per outcome; `addressNormalization` pins canonical addresses. Regenerate with: node scripts/gen-vectors.mjs > vectors.json',
@@ -312,4 +369,5 @@ const out = {
   negativeSignatures,
   zip215,
 }
+// Two-space indentation and a final newline: the format of the committed file, so `check:vectors` can compare byte for byte.
 process.stdout.write(JSON.stringify(out, null, 2) + '\n')

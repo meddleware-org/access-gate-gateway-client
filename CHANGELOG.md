@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Documentation: every file is annotated line by line and has a header; added `CONTRIBUTING.md`; README Development section; CLAUDE.md Commands, Gotchas and Related.
+- The generator `scripts/gen-vectors.mjs` is documented section by section; `vectors.json` is unchanged (`npm run check:vectors` passes).
+- No change to the shipped code: the compiled output of `src/` is identical.
+
 ## [0.0.22] - 2026-10-30
 
 - Point documentation links at the machine zone (ADR-0005). No API change.

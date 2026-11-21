@@ -17,7 +17,7 @@ Targets: Node.js >= 24, browsers, workerd. Public entry is `src/index.ts`; the `
 
 ```text
 src/
-  types.ts      Challenge, AccessProof
+  types.ts      Challenge, AccessProof, AccessMessageContext, SuiNetwork
   challenge.ts  fetchChallenge
   proof.ts      personalMessage, buildAccessProof, encode/decodeAccessProof, gatewayOrigin, isNonce, isTransactionDigest
   contract.ts   gateway response contract (statuses, conflict codes, parseGatewayError)
@@ -25,7 +25,15 @@ scripts/gen-vectors.mjs   generates vectors.json
 tests/                    vitest unit tests, incl. vectors.json verified with an independent verifier (@mysten/sui)
 ```
 
-`npm run type-check && npm run lint && npm test && npm run build`; `npm run gen:vectors` / `npm run check:vectors` for the vectors.
+## Commands
+
+```bash
+npm ci && npm run type-check && npm run lint && npm test && npm run build   # the core of what the `check` CI job runs
+npm run check:vectors                                                       # vectors.json equals what scripts/gen-vectors.mjs produces (npm run gen:vectors rewrites it)
+npm audit --audit-level=high                                                # the dependency check (this repo does not use mw-audit-gate)
+```
+
+Release: bump `version`, push, tag `v<version>`; `npm-publish.yml` re-runs the checks on the tagged commit and publishes with npm trusted publishing.
 
 ---
 
@@ -41,6 +49,22 @@ tests/                    vitest unit tests, incl. vectors.json verified with an
   token encoding — the canonical contract shared with **both** gateway implementations
   (`meddleware-org/access-gate-gateway`). This is the authoritative schema for the docs-site Access Gate
   reference and for anyone verifying proofs.
+
+## Gotchas
+
+- **`vectors.json` is generated and published.** Edit `scripts/gen-vectors.mjs`, run `npm run gen:vectors`, and commit both: the gateways (Workers and Rust) test against this
+  file, and a Rust gateway keeps a vendored copy that CI compares with the installed package. The generator holds three fixed *test* keypairs; they guard nothing.
+- **The decoder must stay as strict as the Rust gateway's.** A token one side accepts and the other refuses is a gap; add a vector (a `proofDecodeRejects` case) with the change.
+- **Every check in `buildAccessProof` runs before the wallet prompt on purpose.** Do not move one after the signature: a person must never be asked to sign a proof that cannot work.
+- **There is no `mw-audit-gate`.** This repository does not depend on `@meddleware/frontend-config`; CI runs `npm audit --audit-level=high`.
+- **`engines` says Node 24.** CI runs the tests on 24 as well as 26 (`node24-compat`); do not use a newer built-in without raising the floor.
+
+## Related
+
+- The audit: [`docs/audit/access-gate-gateway-client-audit.md`](docs/audit/access-gate-gateway-client-audit.md).
+- How to propose a change: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Consumers: `access-gate-gateway` (`gateway-workers` at `^0.0.22`, `worker` at exactly `0.0.22`), `walrus-storage-client`, `docs-site` and `dev-site` (all `^0.0.22`); release them after
+  this package. The chain reads and the builders: `access-gate-client`.
 
 ## Interoperability
 

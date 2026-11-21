@@ -66,11 +66,20 @@ Both gateways in [access-gate-gateway](https://github.com/meddleware-org/access-
 
 ## Development
 
+The package ships its TypeScript source plus a declaration-only build, and has no runtime dependencies. The checks, all run in CI on every push (`.github/workflows/node-ci.yml`;
+the tests also run on Node 24, the minimum in `engines`):
+
 ```bash
-npm run type-check
-npm test
-npm run build   # emits .d.ts into dist/ (also run by prepublishOnly)
+npm ci                           # install exactly the lockfile
+npm run type-check               # tsc over src/ and tests/
+npm run lint                     # eslint (typescript-eslint recommended)
+npm test                         # 159 offline unit tests, including the self-test of vectors.json against the Sui SDK's verifier
+npm run check:vectors            # vectors.json is what scripts/gen-vectors.mjs produces
+npm run build                    # emits .d.ts into dist/ (also run by prepublishOnly)
+npm audit --audit-level=high     # the dependency check
 ```
+
+How to propose a change: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

@@ -1,3 +1,8 @@
+/**
+ * Tests for the access proof (`src/proof.ts`): the signed message is canonical (and so immune to line injection), the origin check is strict and never
+ * echoes its input, the token encoder and decoder apply the same rules, the decoder is as strict as the Rust gateway's (padding, whitespace, UTF-8, JSON
+ * depth, surrogates, number range), and `buildAccessProof` refuses every input a gateway would refuse BEFORE the wallet is asked to sign.
+ */
 import { describe, it, expect, vi } from 'vitest'
 import {
   ACCESS_MESSAGE_VERSION,
@@ -12,13 +17,16 @@ import {
 } from '../src/proof.js'
 import type { AccessMessageContext } from '../src/types.js'
 
+/** The golden 44-character transaction digest (the same one `vectors.json` uses). */
 const DIGEST = '5Wq9tE4gXz8hEvFhYt8KkTJb2Pp6qXqj8cRk3xN1mYdL'
+/** A canonical ownership-gateway context, the baseline the failing cases below change one field of. */
 const CTX: AccessMessageContext = {
   origin: 'https://gateway.example',
   gateId: '0x' + 'a1'.repeat(32),
   network: 'testnet',
   nonce: 'GOLDEN-NONCE-123',
 }
+/** UTF-8 text of some bytes. */
 const text = (b: Uint8Array) => new TextDecoder().decode(b)
 
 describe('personalMessage', () => {
@@ -33,6 +41,7 @@ describe('personalMessage', () => {
     expect(text(personalMessage(CTX))).not.toContain('consume')
   })
 
+  // Each case is canonical except for one field. The nonce with a newline is the injection attempt: it would add a `consume:` line to the signed text.
   it('refuses non-canonical fields, which also blocks line injection', () => {
     for (const bad of [
       { origin: 'http://gateway.example' },
@@ -59,6 +68,7 @@ describe('gatewayOrigin', () => {
     expect(() => gatewayOrigin('gateway.example')).toThrow(/invalid gateway URL/)
   })
 
+  // Error messages reach logs; a URL with a password in it must not.
   it('never echoes the input in an error (it may carry userinfo)', () => {
     for (const secret of ['http://user:s3cret@gateway.example', 'ftp://user:s3cret@gateway.example', 'https://user:s3cret@gateway.example', 'user:s3cret@']) {
       let message = ''
@@ -83,10 +93,12 @@ describe('access proof token', () => {
     expect(decodeAccessProof(encodeAccessProof(single))).toEqual(single)
   })
 
+  // The token's byte layout is part of the contract (the Rust gateway reads it): key order and plain base64.
   it('is btoa(JSON) with the documented key order', () => {
     expect(encodeAccessProof(proof)).toBe(btoa(JSON.stringify(proof)))
   })
 
+  // A token this package emits must be one every gateway accepts, so the encoder refuses what the decoder would.
   it('applies the same rules when encoding as when decoding', () => {
     for (const bad of [
       { ...proof, address: '' },
@@ -110,12 +122,14 @@ describe('access proof token', () => {
 })
 
 describe('decodeAccessProof is strict (the same decisions as the Rust gateway)', () => {
+  // The smallest valid proof JSON, with optional extra members appended.
   const json = (extra = '') => `{"address":"0x1","nonce":"n","signature":"AAAA"${extra}}`
+  // Base64 of a string or of raw bytes (for invalid UTF-8).
   const b64 = (v: string | number[]) => Buffer.from(typeof v === 'string' ? v : Uint8Array.from(v)).toString('base64')
   const proof = { address: '0x1', nonce: 'n', signature: 'AAAA' }
 
   it('accepts canonical padded base64 of every length class', () => {
-    // The bare object (51 bytes) needs no padding, `,"k":"a"` (59) one `=`, `,"k":12` (58) two.
+    // The bare object (51 bytes) needs no padding, `,"k":"a"` (59) one `=`, `,"k":12` (58) two: all three length classes of base64 must decode.
     for (const [extra, padding] of [['', ''], [',"k":"a"', '='], [',"k":12', '==']] as const) {
       const token = b64(json(extra))
       expect(token.endsWith('=') ? token.slice(token.indexOf('=')) : '').toBe(padding)
@@ -130,6 +144,7 @@ describe('decodeAccessProof is strict (the same decisions as the Rust gateway)',
   })
 
   it('refuses whitespace and padding inside the token, but ignores whitespace at either end', () => {
+    // Whitespace inside the token is refused (it is not trimmed there); only the two ends are, as the Rust `trim()` does.
     const token = b64(json())
     for (const ws of [' ', '\n', '\r\n', '\t']) {
       expect(() => decodeAccessProof(token.slice(0, 8) + ws + token.slice(8))).toThrow()
@@ -143,12 +158,14 @@ describe('decodeAccessProof is strict (the same decisions as the Rust gateway)',
 
   it('refuses non-zero trailing bits, excess padding and the URL-safe alphabet', () => {
     const token = b64(json(',"k":"a"'))
+    // Set the low bit of the last symbol: a lenient decoder reads the same bytes, a canonical one refuses.
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
     const body = token.replace(/=+$/, '')
     const dirty = body.slice(0, -1) + alphabet[alphabet.indexOf(body.at(-1) ?? '') | 1] + token.slice(body.length)
     expect(dirty).not.toBe(token)
     expect(() => decodeAccessProof(dirty)).toThrow(/canonical padded base64/)
     expect(() => decodeAccessProof(`${token}=`)).toThrow()
+    // A value chosen so the base64 contains `+` and `/`, then rewritten into the URL-safe alphabet.
     const urlSafe = b64(json(',"k":"~~~???>>>"'))
     expect(urlSafe).toMatch(/[+/]/)
     expect(decodeAccessProof(urlSafe)).toEqual(proof)
@@ -156,6 +173,7 @@ describe('decodeAccessProof is strict (the same decisions as the Rust gateway)',
   })
 
   it('refuses invalid UTF-8 even inside an unknown key, and a byte-order mark', () => {
+    // Invalid byte sequences hidden inside a key the decoder otherwise ignores: overlong, a surrogate, a truncated sequence and stray bytes.
     const prefix = [...Buffer.from('{"address":"0x1","nonce":"n","signature":"AAAA","')]
     for (const bad of [[0xff, 0xfe], [0xc0, 0xaf], [0xed, 0xa0, 0x80], [0xc3]]) {
       expect(() => decodeAccessProof(b64([...prefix, ...bad, ...Buffer.from('":1}')]))).toThrow(/UTF-8/)
@@ -165,7 +183,7 @@ describe('decodeAccessProof is strict (the same decisions as the Rust gateway)',
   })
 
   it('refuses what serde_json refuses inside ignored keys and values', () => {
-    // Unpaired surrogate escapes, including in a value a later duplicate key overwrites.
+    // Unpaired surrogate escapes, including in a value a later duplicate key overwrites (which a reviver could not see).
     for (const extra of [',"\\ud800":1', ',"k":"\\udc00"', ',"k":"\\ud800\\u0041"', ',"k":"\\ud800a"', ',"k":"\\ud800","k":1']) {
       expect(() => decodeAccessProof(b64(json(extra)))).toThrow(/surrogate/)
     }
@@ -179,6 +197,7 @@ describe('decodeAccessProof is strict (the same decisions as the Rust gateway)',
   })
 
   it('allows JSON nested 127 levels (the top-level object counts) and refuses 128', () => {
+    // An unknown key holding `levels` nested arrays; the top-level object is one more level.
     const nested = (levels: number) => json(`,"k":${'['.repeat(levels)}${']'.repeat(levels)}`)
     expect(decodeAccessProof(b64(nested(126)))).toEqual(proof)
     expect(() => decodeAccessProof(b64(nested(127)))).toThrow(/nested/)
@@ -187,10 +206,12 @@ describe('decodeAccessProof is strict (the same decisions as the Rust gateway)',
   })
 
   it('round-trips every token encodeAccessProof emits (all padding classes, the largest field sizes)', () => {
+    // Every nonce length gives a different token length, so every base64 padding class is covered.
     for (let nonceLength = 1; nonceLength <= 128; nonceLength++) {
       const p = { address: '0x' + 'a'.repeat(1 + (nonceLength % 64)), nonce: 'n'.repeat(nonceLength), signature: 'A'.repeat(Math.min(1024, 1 + nonceLength * 8)) }
       expect(decodeAccessProof(encodeAccessProof(p))).toEqual(p)
     }
+    // The largest value of every field: the token must still fit the 4096 limit.
     const largest = { address: '0x' + 'f'.repeat(64), nonce: 'n'.repeat(128), signature: 'A'.repeat(1024) + '==', consumeDigest: DIGEST.padEnd(44, '1') }
     const token = encodeAccessProof(largest)
     expect(token.length).toBeLessThanOrEqual(4096)
@@ -199,10 +220,13 @@ describe('decodeAccessProof is strict (the same decisions as the Rust gateway)',
 })
 
 describe('buildAccessProof', () => {
+  // A challenge that expires in a second.
   const challenge = { nonce: 'xyz', expiresAt: Date.now() + 1000 }
+  // The common options; each test adds a signer and changes what it needs to.
   const base = { address: '0xabc', challenge, gateway: 'https://gateway.example/', gateId: CTX.gateId, network: 'testnet' as const }
 
   it('signs the audience-bound message and returns the token', async () => {
+    // The signer double checks the message it is asked to sign, so a wrong message fails inside the call.
     const sign = vi.fn(async (message: Uint8Array) => {
       expect(text(message)).toBe(text(personalMessage({ ...CTX, nonce: 'xyz' })))
       return { signature: 'QkFTRTY0' }
@@ -226,12 +250,14 @@ describe('buildAccessProof', () => {
     for (const bad of [{ consumeDigest: 'digest1' }, { gateId: '0x1' }, { gateway: 'http://gateway.example' }]) {
       await expect(buildAccessProof({ ...base, sign, ...bad })).rejects.toThrow()
     }
+    // The wallet was never asked: nothing was shown to the person.
     expect(sign).not.toHaveBeenCalled()
   })
 })
 
 describe('buildAccessProof never prompts the wallet for a proof that cannot work (F14)', () => {
   const base = { address: '0xabc', challenge: { nonce: 'xyz', expiresAt: Date.now() + 60_000 }, gateway: 'https://gateway.example/', gateId: CTX.gateId, network: 'testnet' as const }
+  // A fresh signer double per test, so `not.toHaveBeenCalled` is about that test only.
   const signer = () => vi.fn(async () => ({ signature: 'QkFTRTY0' }))
 
   it('refuses a malformed address before the prompt', async () => {
@@ -244,6 +270,7 @@ describe('buildAccessProof never prompts the wallet for a proof that cannot work
 
   it('refuses an expired challenge before the prompt, with a documented skew allowance', async () => {
     const sign = signer()
+    // The same call with a different expiry.
     const at = (expiresAt: number) => ({ ...base, sign, challenge: { nonce: 'xyz', expiresAt } })
     await expect(buildAccessProof(at(Date.now() - CHALLENGE_CLOCK_SKEW_MS - 5_000))).rejects.toThrow(/expired/)
     await expect(buildAccessProof(at(1))).rejects.toThrow(/expired/)
@@ -262,6 +289,7 @@ describe('buildAccessProof never prompts the wallet for a proof that cannot work
 
   it('does not echo the address or the expiry in the error', async () => {
     const sign = signer()
+    // The error must name the field, not repeat the value (it could be a secret pasted into the wrong box).
     const bad = '0xSECRET-ADDRESS'
     const message = await buildAccessProof({ ...base, sign, address: bad }).then(
       () => '',

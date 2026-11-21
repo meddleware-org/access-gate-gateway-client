@@ -1,5 +1,8 @@
 // Self-test of the published conformance vectors: the library and an independent verifier (the Sui
 // SDK) must agree with every case. The gateways run the same file against their own implementations.
+//
+// Why: `vectors.json` is the contract between this client and the Rust gateways. If this package disagreed with its own vectors, or the vectors with the
+// Sui SDK's verifier, the two sides would diverge silently. Every case is therefore checked against both.
 import { describe, it, expect } from 'vitest'
 import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 import { isValidTransactionDigest } from '@mysten/sui/utils'
@@ -8,14 +11,18 @@ import { personalMessage, decodeAccessProof, encodeAccessProof, isTransactionDig
 import { GATEWAY_CONFLICT_CODES, GATEWAY_STATUS, parseGatewayError } from '../src/contract.js'
 import type { AccessMessageContext } from '../src/types.js'
 
+/** Standard base64 of some bytes. */
 const b64 = (b: Uint8Array) => Buffer.from(b).toString('base64')
+/** The signed message for a vector's context (the vectors are untyped JSON, so the cast). */
 const msg = (c: unknown) => personalMessage(c as AccessMessageContext)
 
+/** True if the Sui SDK accepts `signature` as `address`'s personal-message signature over the message for `context` (the independent verifier). */
 async function verifies(address: string, signature: string, context: unknown): Promise<boolean> {
   try {
     await verifyPersonalMessageSignature(msg(context), signature, { address })
     return true
   } catch {
+    // The SDK throws on any invalid signature; for these tests "throws" means "refused".
     return false
   }
 }
@@ -25,6 +32,7 @@ describe('vectors.json', () => {
     expect(vectors.version).toBe('access-gate-gateway:access:v3')
   })
 
+  // The exact text and bytes, so an implementation that formats the message differently fails here.
   it.each(vectors.personalMessage.cases)('personalMessage: $name', (c) => {
     expect(new TextDecoder().decode(msg(c.context))).toBe(c.messageUtf8)
     expect(b64(msg(c.context))).toBe(c.messageBytesBase64)
@@ -42,12 +50,14 @@ describe('vectors.json', () => {
     expect(() => decodeAccessProof(c.token)).toThrow()
   })
 
+  // Real signatures by each scheme verify, and the token round-trips unchanged through decode and encode.
   it.each(vectors.signatures)('signature verifies: $scheme', async (v) => {
     expect(await verifies(v.address, v.signature, v.context)).toBe(true)
     expect(decodeAccessProof(v.proofToken).signature).toBe(v.signature)
     expect(encodeAccessProof(decodeAccessProof(v.proofToken))).toBe(v.proofToken)
   })
 
+  // A valid signature presented for a different audience must fail: this is what stops a replay at another gateway, gate, network or consume.
   it.each(vectors.audienceMismatch)('audience mismatch is refused: $case', async (v) => {
     expect(await verifies(v.address, v.signature, v.context)).toBe(false)
   })
@@ -70,6 +80,7 @@ describe('vectors.json: txDigest (base58 that decodes to exactly 32 bytes)', () 
     expect(() => personalMessage({ ...ctx(), consumeDigest: c.digest })).toThrow(/digest/)
   })
 
+  // A guard on the vectors themselves: the edge lengths and the four excluded alphabet characters must be present, or the lists prove less than they claim.
   it('covers the 43, 44 and 45 character edges and every alphabet exclusion', () => {
     const lengths = (xs: { digest: string }[]) => new Set(xs.map((x) => x.digest.length))
     for (const n of [32, 43, 44]) expect(lengths(vectors.txDigest.valid).has(n)).toBe(true)
@@ -78,12 +89,14 @@ describe('vectors.json: txDigest (base58 that decodes to exactly 32 bytes)', () 
     for (const ch of ['0', 'O', 'I', 'l']) expect(names).toContain(` ${ch} `)
   })
 
+  /** A valid message context to put a digest into. */
   function ctx(): AccessMessageContext {
     return vectors.personalMessage.cases[0]!.context as AccessMessageContext
   }
 })
 
 describe('vectors.json: responses (the gateway answers, pinned for every implementation)', () => {
+  // The three parts of the responses section.
   const { statuses, conflictCodes, cases } = vectors.responses
 
   it('lists exactly GATEWAY_STATUS and GATEWAY_CONFLICT_CODES', () => {
@@ -97,6 +110,7 @@ describe('vectors.json: responses (the gateway answers, pinned for every impleme
   })
 
   it.each(cases)('$outcome: a status the contract defines and a body parseGatewayError reads back', (c) => {
+    // The status is one the contract defines.
     expect(Object.values(GATEWAY_STATUS)).toContain(c.status)
     const body = 'code' in c ? { error: c.error, code: c.code } : { error: c.error }
     expect(parseGatewayError(body)).toEqual(body)

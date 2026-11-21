@@ -1,11 +1,17 @@
+/**
+ * Tests for fetching a challenge (`src/challenge.ts`): the response is parsed strictly (camelCase `expiresAt`, a valid nonce), the request is hardened (https
+ * only, no redirect, no cache, no credentials, a time limit and a byte cap) and the redirect refusal is proved against a real HTTP server, not only a stub.
+ */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { fetchChallenge } from '../src/challenge.js'
 
+// Undo every spy after each test; the stubbed globals are removed where a test needs the real `fetch`.
 afterEach(() => vi.restoreAllMocks())
 
 describe('fetchChallenge', () => {
+  // `fetch` is stubbed with `vi.stubGlobal`, so no request leaves the machine.
   it('parses camelCase expiresAt', async () => {
     vi.stubGlobal(
       'fetch',
@@ -21,6 +27,7 @@ describe('fetchChallenge', () => {
     expect(spy).toHaveBeenCalledWith('https://gw.example/v1/challenge', expect.anything())
   })
 
+  // The Rust gateways emit camelCase; a different spelling means the contract changed and must fail loudly.
   it('does not accept snake_case expires_at', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ nonce: 'n2', expires_at: 456 }), { status: 200 })))
     await expect(fetchChallenge('https://gw.example')).rejects.toThrow(/expiry/)
@@ -37,6 +44,7 @@ describe('fetchChallenge', () => {
   })
 
   it('refuses a body that is not a JSON object', async () => {
+    // JSON that parses but is not an object: each must be refused as having no nonce.
     for (const body of [null, [], 'nonce', 7, [{ nonce: 'n', expiresAt: 1 }]]) {
       vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 200 })))
       await expect(fetchChallenge('https://gw.example')).rejects.toThrow(/nonce/)
@@ -45,8 +53,10 @@ describe('fetchChallenge', () => {
 })
 
 describe('fetchChallenge hardening', () => {
+  // A fetch stub that answers 200 with the given JSON.
   const ok = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }))
 
+  // A gateway may be served under a path; the query and fragment are not part of its identity.
   it('keeps a path prefix and drops query and fragment', async () => {
     const spy = ok({ nonce: 'n', expiresAt: 1 })
     vi.stubGlobal('fetch', spy)
@@ -61,6 +71,7 @@ describe('fetchChallenge hardening', () => {
     await expect(fetchChallenge('http://127.0.0.1:8787')).resolves.toEqual({ nonce: 'n', expiresAt: 1 })
   })
 
+  // The stub never answers until the signal aborts, which is what a hung gateway looks like.
   it('always passes an abort signal, and times out a hung gateway', async () => {
     vi.stubGlobal(
       'fetch',
@@ -80,12 +91,14 @@ describe('fetchChallenge hardening', () => {
           new Promise<Response>((_, reject) => init.signal!.addEventListener('abort', () => reject(new Error('aborted')))),
       ),
     )
+    // Abort after the request has started.
     const ctl = new AbortController()
     const p = fetchChallenge('https://gw.example', { signal: ctl.signal })
     ctl.abort()
     await expect(p).rejects.toThrow(/aborted/)
   })
 
+  // One rejection per way a body can be wrong: too big, not JSON, a bad nonce (empty, with a space, non-ASCII), a bad expiry (string, zero, negative, null).
   it('rejects oversized, non-JSON and badly typed responses', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('x'.repeat(5000), { status: 200 })))
     await expect(fetchChallenge('https://gw.example')).rejects.toThrow(/too large/)
@@ -112,6 +125,7 @@ describe('fetchChallenge hardening', () => {
     vi.stubGlobal('fetch', spy)
     await fetchChallenge('https://gw.example')
     expect(spy).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ redirect: 'error' }))
+    // An endless body with no Content-Length: only the running byte count can stop it.
     const stream = new ReadableStream<Uint8Array>({
       pull(ctl) {
         ctl.enqueue(new TextEncoder().encode('x'.repeat(1024)))
@@ -122,6 +136,7 @@ describe('fetchChallenge hardening', () => {
   })
 })
 
+// F11 of the audit: a nonce must be fresh and anonymous, so the request options are asserted as a set.
 describe('fetchChallenge request options (F11)', () => {
   it('never uses an HTTP cache and sends no ambient credentials', async () => {
     const spy = vi.fn(async () => new Response(JSON.stringify({ nonce: 'n', expiresAt: 1 }), { status: 200 }))
@@ -137,12 +152,15 @@ describe('fetchChallenge request options (F11)', () => {
 describe('fetchChallenge against a real HTTP server', () => {
   beforeEach(() => vi.unstubAllGlobals()) // the real fetch, not an earlier test's stub
 
+  /** Start a local HTTP server on a free port; `hits` records every request it receives, so a test can prove a URL was never contacted. */
   async function serve(handler: Parameters<typeof createServer>[1]) {
+    // `GET /path` for each request, in order.
     const hits: string[] = []
     const server = createServer((req, res) => {
       hits.push(`${req.method} ${req.url}`)
       handler?.(req, res)
     })
+    // Port 0 asks the system for a free one; loopback only.
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
     return { url, hits, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
@@ -172,6 +190,7 @@ describe('fetchChallenge against a real HTTP server', () => {
   })
 
   it('rejects a 301 to another origin without contacting it', async () => {
+    // The redirect target: a second server that must never be contacted.
     const other = await serve((_req, res) => res.end(JSON.stringify({ nonce: 'x', expiresAt: 1 })))
     const s = await serve((_req, res) => res.writeHead(301, { location: `${other.url}/v1/challenge` }).end())
     try {
