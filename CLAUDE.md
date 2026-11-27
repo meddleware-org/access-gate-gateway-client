@@ -59,6 +59,10 @@ Release: bump `version`, push, tag `v<version>`; `npm-publish.yml` re-runs the c
 - **There is no `mw-audit-gate`.** This repository does not depend on `@meddleware/frontend-config`; CI runs `npm audit --audit-level=high`.
 - **`engines` says Node 24.** CI runs the tests on 24 as well as 26 (`node24-compat`); do not use a newer built-in without raising the floor.
 
+## Documentation rules (workspace documentation standard, D144)
+
+Every file has a header and every declaration a TSDoc comment (private declarations included); comments say why. `node scripts/check-docs.mjs --report access-gate-gateway-client` (in the workspace repository) is the gate. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Related
 
 - The audit: [`docs/audit/access-gate-gateway-client-audit.md`](docs/audit/access-gate-gateway-client-audit.md).
